@@ -1,6 +1,8 @@
-﻿using GoldeenRide.Services;
-using System.Globalization;
-using System.Linq;
+using System;
+using System.Threading.Tasks;
+using GoldeenRide.Services;
+using GoldeenRide.ViewModels;
+using Microsoft.Maui.Controls;
 
 namespace GoldeenRide;
 
@@ -9,57 +11,59 @@ public partial class App : Application
     public App()
     {
         InitializeComponent();
-        SetAppLanguage();
     }
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        return new Window(new AppShell());
+        var window = new Window(new AppShell());
+
+        window.Created += async (s, e) =>
+        {
+            await InitializarSesionAsync();
+        };
+
+        return window;
     }
 
-    private void SetAppLanguage()
+    private async Task InitializarSesionAsync()
     {
-        string idiomaCelular = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
-        ResourceDictionary diccionarioIdioma;
-
-        if (idiomaCelular == "es")
-            diccionarioIdioma = new GoldeenRide.Resources.Translations.AppResourcesEs();
-        else
-            diccionarioIdioma = new GoldeenRide.Resources.Translations.AppResourcesEn();
-
-        if (Current != null)
+        try
         {
-            var diccionarioAnterior = Current.Resources.MergedDictionaries.LastOrDefault();
-            if (diccionarioAnterior != null)
-                Current.Resources.MergedDictionaries.Remove(diccionarioAnterior);
-
-            Current.Resources.MergedDictionaries.Add(diccionarioIdioma);
-        }
-    }
-
-    protected override async void OnStart()
-    {
-        base.OnStart();
-
-        bool sesionActiva = await SupabaseService.Instance.IsSessionActiveAsync();
-
-        if (sesionActiva)
-        {
-            var usuario = SupabaseService.Instance.GetCurrentUser();
-            if (usuario != null && !string.IsNullOrEmpty(usuario.Id))
+            bool sesionActiva = await SupabaseService.Instance.IsSessionActiveAsync();
+            if (sesionActiva && Shell.Current != null)
             {
-                var datos = await SupabaseService.Instance.GetUserDataAsync(usuario.Id!); 
-
-                if (datos != null)
+                var usuario = SupabaseService.Instance.GetCurrentUser();
+                if (usuario != null && !string.IsNullOrEmpty(usuario.Id))
                 {
-                    await ViewModels.AppShellViewModel.Instance.UpdateMenuStateAsync();
+                    var datos = await SupabaseService.Instance.GetUserDataAsync(usuario.Id!);
+                    await AppShellViewModel.Instance.UpdateMenuStateAsync();
 
-                    if (datos.Rol.ToLower().Contains("pasajero"))
-                        await Shell.Current!.GoToAsync("///passenger-dashboard");
+                    if (datos != null && !string.IsNullOrEmpty(datos.Rol))
+                    {
+                        string rol = datos.Rol.ToLower();
+
+                        if (rol.Contains("chofer") || rol.Contains("driver"))
+                        {
+                            await Shell.Current.GoToAsync("//driver-dashboard");
+                        }
+                        else if (rol.Contains("pasajero") || rol.Contains("passenger"))
+                        {
+                            await Shell.Current.GoToAsync("//passenger-dashboard");
+                        }
+                    }
                     else
-                        await Shell.Current!.GoToAsync("///driver-dashboard");
+                    {
+                        // 🟢 FIX: Es un usuario de Google que aún no tiene rol.
+                        // Apagamos el menú de 3 rayas y lo encerramos en el paso 2.
+                        AppShellViewModel.Instance.ResetMenu();
+                        await Shell.Current.GoToAsync("//register-step2");
+                    }
                 }
             }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ Error de navegación: {ex.Message}");
         }
     }
 }

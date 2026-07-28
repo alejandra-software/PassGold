@@ -16,14 +16,14 @@ public class Vehiculo : BaseModel
     [Column("placa")]
     public string Placa { get; set; } = string.Empty;
 
-    [Column("modelo")]
-    public string? Modelo { get; set; }
-
     [Column("capacidad")]
     public int Capacidad { get; set; }
 
-    [Column("foto_vehiculo")]
-    public string? FotoVehiculo { get; set; }
+    [Column("estado")]
+    public string Estado { get; set; } = "activo";
+
+    [Column("foto_url")]
+    public string FotoUrl { get; set; } = string.Empty;
 
     [Column("creado_en")]
     public DateTime CreadoEn { get; set; } = DateTime.UtcNow;

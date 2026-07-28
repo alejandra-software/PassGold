@@ -1,74 +1,42 @@
-﻿<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
-    <!--  Fondo de página: automático según tema -->
     <Style TargetType="ContentPage" ApplyToDerivedTypes="True">
-        <Setter Property="BackgroundColor"
-                Value="{AppThemeBinding Light={StaticResource LightBg},
-                                        Dark={StaticResource DarkBg}}" />
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}" />
     </Style>
 
-    <!--  ScrollView transparente para no tapar el fondo de página -->
     <Style TargetType="ScrollView">
         <Setter Property="BackgroundColor" Value="Transparent" />
     </Style>
 
-    <!--  Todos los Label: color de texto automático -->
     <Style TargetType="Label">
-        <Setter Property="TextColor"
-                Value="{AppThemeBinding Light={StaticResource LightText},
-                                        Dark={StaticResource DarkText}}" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" />
     </Style>
 
-    <!--  Controles de entrada de texto (Entry) -->
     <Style TargetType="Entry">
-        <Setter Property="TextColor"
-                Value="{AppThemeBinding Light={StaticResource LightText},
-                                        Dark={StaticResource DarkText}}" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" />
         <Setter Property="BackgroundColor" Value="Transparent" />
-        <Setter Property="PlaceholderColor"
-                Value="{AppThemeBinding Light={StaticResource LightHint},
-                                        Dark={StaticResource DarkHint}}" />
+        <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource LightHint}, Dark={StaticResource DarkHint}}" />
     </Style>
 
-    <!--  Pickers (Desplegables) y TimePickers (Selector de hora) adaptables al modo oscuro -->
     <Style TargetType="Picker">
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" />
         <Setter Property="TitleColor" Value="{AppThemeBinding Light={StaticResource LightHint}, Dark={StaticResource DarkHint}}" />
         <Setter Property="BackgroundColor" Value="Transparent" />
     </Style>
 
-    <Style TargetType="TimePicker">
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" />
-        <Setter Property="BackgroundColor" Value="Transparent" />
-    </Style>
-
-    <!--  RadioButton: texto visible en ambos temas -->
-    <Style TargetType="RadioButton">
-        <Setter Property="TextColor"
-                Value="{AppThemeBinding Light={StaticResource LightText},
-                                        Dark={StaticResource DarkText}}" />
-        <Setter Property="BackgroundColor" Value="Transparent" />
-    </Style>
-
-    <!-- BoxView (divisores): se adapta al tema -->
     <Style TargetType="BoxView">
-        <Setter Property="Color"
-                Value="{AppThemeBinding Light={StaticResource LightDivider},
-                                        Dark={StaticResource DarkDivider}}" />
+        <Setter Property="Color" Value="{AppThemeBinding Light={StaticResource LightDivider}, Dark={StaticResource DarkDivider}}" />
     </Style>
 
-    <!--  NUEVO: Botones con la identidad visual (Dorado) por defecto -->
     <Style TargetType="Button">
-        <!-- Usa tu color Primary (Asegúrate de que en Colors.xaml el Primary sea el #D4AF37 dorado) -->
         <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
         <Setter Property="TextColor" Value="#000000" />
-        <!-- Letra negra sobre el dorado -->
         <Setter Property="CornerRadius" Value="8" />
         <Setter Property="FontAttributes" Value="Bold" />
         <Setter Property="Padding" Value="14,10" />
-        <!-- Efecto visual cuando el botón está desactivado -->
+
         <Style.Triggers>
             <Trigger TargetType="Button" Property="IsEnabled" Value="False">
                 <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource LightButtonSec}, Dark={StaticResource DarkButtonSec}}" />
@@ -77,9 +45,6 @@
         </Style.Triggers>
     </Style>
 
-    <!--  Indicadores de carga siempre con el color de la marca -->
-    <Style TargetType="ActivityIndicator">
-        <Setter Property="Color" Value="{StaticResource Primary}" />
-    </Style>
+   
 
 </ResourceDictionary>

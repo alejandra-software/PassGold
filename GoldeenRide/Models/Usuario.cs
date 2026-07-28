@@ -27,4 +27,24 @@ public class Usuario : BaseModel
 
     [Column("id_jefe")]
     public string? IdJefe { get; set; }
+
+    [Column("estado")]
+    public string Estado { get; set; } = "activo"; // activo, inactivo, incapacidad
+
+    [Column("id_vehiculo_default")]
+    public string? IdVehiculoDefault { get; set; }
+
+    [Column("nombre_flota")]
+    public string? NombreFlota { get; set; }
+
+    [Column("descripcion_flota")]
+    public string? DescripcionFlota { get; set; }
+
+    [Column("foto_portada")]
+    public string? FotoPortada { get; set; }
+
+    // ─── NUEVO: código corto y amigable para unirse a la flota ───
+    // Ya NO usamos el UUID del jefe como "código secreto".
+    [Column("codigo_flota")]
+    public string? CodigoFlota { get; set; }
 }

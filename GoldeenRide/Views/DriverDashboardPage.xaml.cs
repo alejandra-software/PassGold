@@ -10,13 +10,12 @@ public partial class DriverDashboardPage : ContentPage
         BindingContext = new DriverDashboardViewModel();
     }
 
-   
-    protected override void OnAppearing()
+    protected override async void OnAppearing()
     {
         base.OnAppearing();
         if (BindingContext is DriverDashboardViewModel vm)
         {
-            vm.LoadDriverDataAsyncCommand.Execute(null);
+            await vm.LoadDriverDataCommand.ExecuteAsync(null);
         }
     }
 }

@@ -8,30 +8,40 @@ namespace GoldeenRide.Models;
 public class Viaje : BaseModel
 {
     [PrimaryKey("id", false)]
-    public string Id { get; set; } = string.Empty;
+    public string Id { get; set; } = "";
 
-    [Column("id_chofer")]
-    public string IdChofer { get; set; } = string.Empty;
-
-    [Column("id_vehiculo")]
-    public string? IdVehiculo { get; set; }
+    [Column("id_creador")]
+    public string? IdCreador { get; set; }
 
     [Column("tipo_viaje")]
-    public string TipoViaje { get; set; } = string.Empty;
+    public string TipoViaje { get; set; } = "";
 
+    // 🔥 NUEVOS CAMPOS: TIEMPOS REALES Y RUTA 🔥
+    [Column("id_ruta")]
+    public string? IdRuta { get; set; }
+
+    [Column("hora_inicio_recorrido")]
+    public TimeSpan? HoraInicioRecorrido { get; set; }
+
+    [Column("hora_llegada_destino")]
+    public TimeSpan? HoraLlegadaDestino { get; set; }
+
+    // Mantenemos estos por compatibilidad temporal con datos viejos
     [Column("hora_salida")]
     public DateTime HoraSalida { get; set; }
 
     [Column("ruta_general")]
-    public string RutaGeneral { get; set; } = string.Empty;
+    public string RutaGeneral { get; set; } = "";
 
     [Column("estado")]
-    public string Estado { get; set; } = string.Empty;
+    public string Estado { get; set; } = "programado";
 
-    [Column("creado_en")]
-    public DateTime CreadoEn { get; set; } = DateTime.UtcNow;
-
-    // 👇 NUEVA COLUMNA
     [Column("dias_semana")]
-    public string DiasSemana { get; set; } = string.Empty;
+    public string DiasSemana { get; set; } = "";
+
+    [Column("fecha_inicio")]
+    public DateTime? FechaInicio { get; set; }
+
+    [Column("fecha_fin")]
+    public DateTime? FechaFin { get; set; }
 }

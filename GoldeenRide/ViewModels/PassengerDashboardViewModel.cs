@@ -14,7 +14,6 @@ public partial class PassengerDashboardViewModel : ObservableObject
 {
     private readonly SupabaseService _supabaseService = SupabaseService.Instance;
 
-    // Lista de viajes disponibles que verá el estudiante
     public ObservableCollection<Viaje> ViajesDisponibles { get; } = new();
 
     [ObservableProperty] private string studentName = "Estudiante";
@@ -46,7 +45,6 @@ public partial class PassengerDashboardViewModel : ObservableObject
         IsLoading = false;
     }
 
-    // Este comando se ejecuta cuando el estudiante elige un día en el calendario
     [RelayCommand]
     public async Task DiaSeleccionadoCambioAsync(DateTime nuevaFecha)
     {
@@ -56,17 +54,15 @@ public partial class PassengerDashboardViewModel : ObservableObject
 
     private async Task CargarViajesPorFecha(DateTime fecha)
     {
-        // Pedir todos los viajes activos a Supabase
         var todosLosViajes = await _supabaseService.GetAllActiveTripsAsync();
 
         ViajesDisponibles.Clear();
 
-        //  Filtrar Mostrar solo los que salen ese día o que son recurrentes (Lunes a Viernes)
         string diaAbreviado = ObtenerAbreviaturaDia(fecha);
 
         var viajesDelDia = todosLosViajes.Where(v =>
-            v.HoraSalida.Date == fecha.Date || // Si es un viaje único para esa fecha exacta
-            v.DiasSemana.Contains(diaAbreviado) // O si es un viaje recurrente que pasa ese día
+            v.HoraSalida.Date == fecha.Date ||
+            v.DiasSemana.Contains(diaAbreviado)
         ).OrderBy(v => v.HoraSalida.TimeOfDay).ToList();
 
         foreach (var v in viajesDelDia)
@@ -90,13 +86,11 @@ public partial class PassengerDashboardViewModel : ObservableObject
         };
     }
 
-    // Comando cuando el estudiante toca el botón "Reservar" en un viaje
     [RelayCommand]
     public async Task ReservarViajeAsync(Viaje viajeSeleccionado)
     {
         if (viajeSeleccionado == null || Shell.Current == null) return;
 
-        // Le preguntamos al estudiante dónde quiere que lo recojan
         string puntoRecogida = await Shell.Current.DisplayPromptAsync(
             "Reservar Asiento",
             "¿En qué punto te recogerá el microbús? (Ej. Metrocentro, Pasarela UCA)",

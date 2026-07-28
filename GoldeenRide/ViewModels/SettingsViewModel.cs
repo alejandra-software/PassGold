@@ -60,7 +60,10 @@ public partial class SettingsViewModel : ObservableObject
 
                 if (IsFleetManager)
                 {
-                    MyFleetCode = _currentUserData.Id;
+                    // ✅ Ya NO mostramos el UUID. Se genera (o recupera) un código
+                    // corto de 6 caracteres, amigable para compartir de palabra o por WhatsApp.
+                    MyFleetCode = await _supabaseService.GetOrCreateFleetCodeAsync(_currentUserData.Id)
+                                   ?? "Error generando código";
                 }
 
                 if (IsEmployee && !string.IsNullOrEmpty(_currentUserData.IdJefe))
@@ -85,29 +88,64 @@ public partial class SettingsViewModel : ObservableObject
                 GetTranslation("AlertOk"));
     }
 
+    // 🔥 NUEVO: Regenerar el código por seguridad (ej. si sospechas que se filtró).
+    // Sin caducidad automática — el jefe decide cuándo cambiarlo con este botón.
+    [RelayCommand]
+    public async Task RegenerateFleetCodeAsync()
+    {
+        if (_currentUserData == null || Shell.Current == null) return;
+
+        bool confirmar = await Shell.Current.DisplayAlert(
+            "Regenerar código",
+            "El código actual dejará de funcionar de inmediato para cualquiera que intente unirse con él. Los empleados que ya están en tu flota NO se ven afectados. ¿Continuar?",
+            "Sí, regenerar", "Cancelar");
+        if (!confirmar) return;
+
+        IsLoading = true;
+        string? nuevoCodigo = await _supabaseService.RegenerateFleetCodeAsync(_currentUserData.Id);
+        IsLoading = false;
+
+        if (nuevoCodigo != null)
+        {
+            MyFleetCode = nuevoCodigo;
+            await Shell.Current.DisplayAlert("Listo", $"Tu nuevo código es: {nuevoCodigo}", "OK");
+        }
+        else
+        {
+            await Shell.Current.DisplayAlert("Error", "No se pudo regenerar el código. Intenta de nuevo.", "OK");
+        }
+    }
+
     [RelayCommand]
     public async Task JoinFleetAsync()
     {
         if (string.IsNullOrWhiteSpace(InputFleetCode))
         {
             if (Shell.Current != null)
-                await Shell.Current.DisplayAlertAsync(GetTranslation("AlertAttention"), GetTranslation("AlertEmptyCode"), GetTranslation("AlertOk"));
+                await Shell.Current.DisplayAlertAsync("Atención", "Ingresa el código que te dio tu jefe.", "OK");
             return;
         }
 
         if (_currentUserData == null || Shell.Current == null) return;
 
         IsLoading = true;
-        var (success, message) = await _supabaseService.JoinFleetByCodeAsync(InputFleetCode.Trim(), _currentUserData.Id);
+
+        // Limpiar el código de espacios/saltos de línea invisibles.
+        // El servicio ya normaliza a mayúsculas, así que no importa cómo lo escriba el usuario.
+        string codigoLimpio = InputFleetCode.Trim();
+
+        var (success, message) = await _supabaseService.JoinFleetByCodeAsync(codigoLimpio, _currentUserData.Id);
 
         if (success)
         {
-            await Shell.Current.DisplayAlertAsync(GetTranslation("AlertWelcome"), message, GetTranslation("AlertOk"));
+            InputFleetCode = string.Empty;
+            await Shell.Current.DisplayAlertAsync("¡Bienvenido!", message, "OK");
+            // Recargamos el perfil para que la UI se actualice y muestre "Trabajando en la flota de..."
             await LoadProfileAsync();
         }
         else
         {
-            await Shell.Current.DisplayAlertAsync(GetTranslation("AlertError"), message, GetTranslation("AlertOk"));
+            await Shell.Current.DisplayAlertAsync("Error de vinculación", message, "Cerrar");
         }
         IsLoading = false;
     }

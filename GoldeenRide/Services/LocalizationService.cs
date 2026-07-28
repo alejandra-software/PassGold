@@ -1,9 +1,11 @@
-﻿using System.Globalization;
+using System.Globalization;
+using System.Reflection;
+using GoldeenRide.Helpers; // Referencia a nuestra clase de textos
 
 namespace GoldeenRide.Services;
 
 /// <summary>
-
+/// Servicio de localización actualizado para usar AppResources de C#
 /// </summary>
 public class LocalizationService
 {
@@ -13,12 +15,15 @@ public class LocalizationService
     private LocalizationService() { }
 
     /// <summary>
-
     /// </summary>
     public string GetString(string key)
     {
-        if (Application.Current?.Resources.TryGetValue(key, out var value) == true)
-            return value?.ToString() ?? key;
+        // Busca el texto en la nueva clase estática AppResources de C#
+        var propertyInfo = typeof(AppResources).GetProperty(key, BindingFlags.Public | BindingFlags.Static);
+        if (propertyInfo != null)
+        {
+            return propertyInfo.GetValue(null)?.ToString() ?? key;
+        }
         return key;
     }
 

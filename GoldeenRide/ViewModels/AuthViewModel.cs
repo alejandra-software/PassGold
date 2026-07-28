@@ -15,7 +15,6 @@ public partial class AuthViewModel : ObservableObject
     public static readonly AuthViewModel Instance = new();
 
     private readonly SupabaseService _supabaseService = SupabaseService.Instance;
-    private readonly LocalizationService _localizationService = LocalizationService.Instance;
 
     // ─── PROPIEDADES LOGIN ───────────────────────────────────
     [ObservableProperty] private string loginEmail = string.Empty;
@@ -79,7 +78,7 @@ public partial class AuthViewModel : ObservableObject
         await Shell.Current.GoToAsync("///login");
     }
 
-    // ─── LÓGICA DE LOGIN ──────────────────
+    // ─── LÓGICA DE LOGIN CON CORREO ──────────────────
     [RelayCommand]
     public async Task Login()
     {
@@ -92,10 +91,29 @@ public partial class AuthViewModel : ObservableObject
         IsLoginLoading = true;
         LoginErrorMessage = string.Empty;
 
+        var (success, message, session) = await _supabaseService.LoginAsync(LoginEmail, LoginPassword);
+        await ProcessLoginResult(success, message, session);
+
+        IsLoginLoading = false;
+    }
+
+    // ─── LÓGICA DE LOGIN NATIVO DE GOOGLE ──────────────────
+    [RelayCommand]
+    public async Task LoginWithGoogle()
+    {
+        IsLoginLoading = true;
+        LoginErrorMessage = string.Empty;
+
+        var (success, message, session) = await _supabaseService.LoginWithGoogleNativeAsync();
+        await ProcessLoginResult(success, message, session);
+
+        IsLoginLoading = false;
+    }
+
+    private async Task ProcessLoginResult(bool success, string message, Supabase.Gotrue.Session? session)
+    {
         try
         {
-            var (success, message, session) = await _supabaseService.LoginAsync(LoginEmail, LoginPassword);
-
             if (success && session?.User != null)
             {
                 var usuarioBaseDatos = await _supabaseService.GetUserDataAsync(session.User.Id);
@@ -107,14 +125,18 @@ public partial class AuthViewModel : ObservableObject
                 {
                     string rolFormateado = usuarioBaseDatos.Rol.ToLower();
 
+                    // 🔥 LA MAGIA: Encendemos y actualizamos el menú de 3 rayas ANTES de cambiar de pantalla
+                    await AppShellViewModel.Instance.UpdateMenuStateAsync();
+
                     if (rolFormateado.Contains("chofer") || rolFormateado.Contains("driver"))
                         await Shell.Current.GoToAsync("///driver-dashboard");
                     else
-                        await Shell.Current.GoToAsync("///login");
+                        await Shell.Current.GoToAsync("///passenger-dashboard");
                 }
                 else
                 {
-                    LoginErrorMessage = "No se pudo recuperar tu perfil.";
+                    LoginErrorMessage = "Cuenta nueva. Por favor completa tu registro.";
+                    await Shell.Current.GoToAsync("///register-step2");
                 }
             }
             else
@@ -125,10 +147,6 @@ public partial class AuthViewModel : ObservableObject
         catch (Exception ex)
         {
             LoginErrorMessage = $"Error: {ex.Message}";
-        }
-        finally
-        {
-            IsLoginLoading = false;
         }
     }
 
@@ -171,38 +189,78 @@ public partial class AuthViewModel : ObservableObject
 
         try
         {
-            // Registrar enviando todo por seguridad, el SQL Trigger hace el guardado en la tabla pública
-            var (authSuccess, authMessage) = await _supabaseService.RegisterAsync(
-                RegisterEmail,
-                RegisterPassword,
-                RegisterName,
-                SelectedRole,
-                RegisterPhotoPath ?? ""
-            );
+            var currentUser = _supabaseService.GetCurrentUser();
 
-            if (!authSuccess)
+            if (currentUser != null)
             {
-                RegisterStep2ErrorMessage = authMessage;
-                return;
+                // CASO A: USUARIO DE GOOGLE
+                bool success = await _supabaseService.SaveUserDataAsync(currentUser.Id, RegisterName, SelectedRole, RegisterPhotoPath ?? "");
+
+                if (success)
+                {
+                    string rolElegido = SelectedRole.ToLower();
+
+                    RegisterName = string.Empty;
+                    SelectedRole = string.Empty;
+                    RegisterPhotoPath = string.Empty;
+
+                    // 🔥 LA MAGIA: Encendemos el menú de 3 rayas al terminar el registro
+                    await AppShellViewModel.Instance.UpdateMenuStateAsync();
+
+                    if (rolElegido.Contains("chofer"))
+                        await Shell.Current.GoToAsync("///driver-dashboard");
+                    else
+                        await Shell.Current.GoToAsync("///passenger-dashboard");
+
+                    return;
+                }
+                else
+                {
+                    RegisterStep2ErrorMessage = "No se pudo guardar tu perfil. Intenta de nuevo.";
+                    return;
+                }
             }
-
-            RegisterEmail = string.Empty;
-            RegisterPassword = string.Empty;
-            RegisterConfirmPassword = string.Empty;
-            RegisterName = string.Empty;
-            SelectedRole = string.Empty;
-            RegisterPhotoPath = string.Empty;
-
-            if (Shell.Current != null)
+            else
             {
-                await Shell.Current.DisplayAlert(
-                    "✅ ¡Revisa tu correo!",
-                    "Tu cuenta fue creada. Por favor confirma tu correo electrónico antes de iniciar sesión.",
-                    "Entendido"
+                // CASO B: REGISTRO NORMAL (CORREO)
+                if (string.IsNullOrWhiteSpace(RegisterEmail) || string.IsNullOrWhiteSpace(RegisterPassword))
+                {
+                    RegisterStep2ErrorMessage = "Los datos del paso 1 se perdieron. Por favor, dale Atrás y vuelve a ingresarlos.";
+                    return;
+                }
+
+                var (authSuccess, authMessage) = await _supabaseService.RegisterAsync(
+                    RegisterEmail,
+                    RegisterPassword,
+                    RegisterName,
+                    SelectedRole,
+                    RegisterPhotoPath ?? ""
                 );
-            }
 
-            await Shell.Current.GoToAsync("///login");
+                if (!authSuccess)
+                {
+                    RegisterStep2ErrorMessage = authMessage;
+                    return;
+                }
+
+                RegisterEmail = string.Empty;
+                RegisterPassword = string.Empty;
+                RegisterConfirmPassword = string.Empty;
+                RegisterName = string.Empty;
+                SelectedRole = string.Empty;
+                RegisterPhotoPath = string.Empty;
+
+                if (Shell.Current != null)
+                {
+                    await Shell.Current.DisplayAlert(
+                        "✅ ¡Revisa tu correo!",
+                        "Tu cuenta fue creada. Por favor confirma tu correo electrónico antes de iniciar sesión.",
+                        "Entendido"
+                    );
+                }
+
+                await Shell.Current.GoToAsync("///login");
+            }
         }
         catch (Exception ex)
         {

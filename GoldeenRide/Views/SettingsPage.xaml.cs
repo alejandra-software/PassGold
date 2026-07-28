@@ -9,13 +9,13 @@ public partial class SettingsPage : ContentPage
         InitializeComponent();
     }
 
-    
     protected override void OnAppearing()
     {
         base.OnAppearing();
         if (BindingContext is SettingsViewModel vm)
         {
-            vm.LoadProfileAsyncCommand.Execute(null);
+            // ✅ Le quitamos la palabra "Async" al comando
+            vm.LoadProfileCommand.Execute(null);
         }
     }
 }

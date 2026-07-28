@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:GoldeenRide.ViewModels"
+             xmlns:helpers="clr-namespace:GoldeenRide.Helpers"
+             x:Class="GoldeenRide.Views.EditTripPage"
+             Title="{helpers:Translate EditTrip_Title}"
+             BackgroundColor="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}">
+
+    <ContentPage.BindingContext>
+        <viewmodels:EditTripViewModel />
+    </ContentPage.BindingContext>
+
+    <Grid>
+        <ScrollView>
+            <VerticalStackLayout Padding="20" Spacing="20">
+
+                <Border Stroke="{StaticResource Error}" StrokeThickness="2" StrokeShape="RoundRectangle 8" BackgroundColor="{AppThemeBinding Light=#FFEBEB, Dark=#3A1C1C}" Padding="15">
+                    <VerticalStackLayout Spacing="5">
+                        <Label Text="{helpers:Translate EditTrip_WarningTitle}" FontAttributes="Bold" TextColor="{StaticResource Error}"/>
+                        <Label Text="{helpers:Translate EditTrip_WarningDesc}" FontSize="13" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="{helpers:Translate EditTrip_Route}" FontSize="13" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                    <Border Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeShape="RoundRectangle 8" Padding="10,0">
+                        <Entry Text="{Binding RutaActualInfo}" IsReadOnly="True" TextColor="{AppThemeBinding Light={StaticResource LightHint}, Dark={StaticResource DarkHint}}" />
+                    </Border>
+                </VerticalStackLayout>
+
+                <BoxView HeightRequest="1" Color="{AppThemeBinding Light={StaticResource LightDivider}, Dark={StaticResource DarkDivider}}" Margin="0,10"/>
+
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="¿Para cuándo aplica este cambio?" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                    <Border Stroke="{StaticResource Primary}" StrokeShape="RoundRectangle 8" Padding="10,0">
+                        <Picker ItemsSource="{Binding OpcionesAlcance}" SelectedItem="{Binding AlcanceSeleccionado}" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="{helpers:Translate EditTrip_Departure}" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                    <Border Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeShape="RoundRectangle 8" Padding="10,0">
+                        <TimePicker Time="{Binding NuevaHora}" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <Label Text="{helpers:Translate EditTrip_NewAssign}" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+
+                <!-- Chofer Principal -->
+                <Grid ColumnDefinitions="*, *" ColumnSpacing="15">
+                    <VerticalStackLayout Grid.Column="0" Spacing="5">
+                        <Label Text="{helpers:Translate EditTrip_SelectDriver}" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                        <Border Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeShape="RoundRectangle 8" Padding="10,0">
+                            <Picker ItemsSource="{Binding ChoferesActivos}" SelectedItem="{Binding NuevoChofer}" ItemDisplayBinding="{Binding Nombre}" Title="Chofer" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Grid.Column="1" Spacing="5">
+                        <Label Text="{helpers:Translate EditTrip_SelectBus}" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                        <Border Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeShape="RoundRectangle 8" Padding="10,0">
+                            <Picker ItemsSource="{Binding VehiculosActivos}" SelectedItem="{Binding NuevoVehiculo}" ItemDisplayBinding="{Binding Placa}" Title="Microbús" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                        </Border>
+                    </VerticalStackLayout>
+                </Grid>
+
+                <!-- MICROBUSES DE APOYO -->
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding MicrobusesDeApoyo}" Spacing="10">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate>
+                            <Border Stroke="{StaticResource Primary}" StrokeShape="RoundRectangle 8" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Padding="10">
+                                <Grid ColumnDefinitions="*, *, Auto" ColumnSpacing="10">
+                                    <Picker Grid.Column="0" ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditTripViewModel}}, Path=ChoferesActivos}" ItemDisplayBinding="{Binding Nombre}" SelectedItem="{Binding Chofer, Mode=TwoWay}" Title="Chofer Apoyo" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                                    <Picker Grid.Column="1" ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditTripViewModel}}, Path=VehiculosActivos}" ItemDisplayBinding="{Binding Placa}" SelectedItem="{Binding Vehiculo, Mode=TwoWay}" Title="Micro Apoyo" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                                    <ImageButton Grid.Column="2" VerticalOptions="Center" WidthRequest="24" HeightRequest="24" Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditTripViewModel}}, Path=QuitarMicrobusApoyoCommand}" CommandParameter="{Binding .}">
+                                        <ImageButton.Source>
+                                            <FontImageSource FontFamily="OpenSansRegular" Glyph="❌" Color="{StaticResource Error}"/>
+                                        </ImageButton.Source>
+                                    </ImageButton>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+
+                <Button Text="➕ Añadir Microbús de Apoyo" Command="{Binding AgregarMicrobusApoyoCommand}" BackgroundColor="Transparent" TextColor="{StaticResource Primary}" BorderColor="{StaticResource Primary}" BorderWidth="1" CornerRadius="8" HeightRequest="40" Margin="0,5"/>
+
+                <Button Text="{helpers:Translate EditTrip_SaveBtn}" Command="{Binding GuardarCambiosCommand}" BackgroundColor="{StaticResource Primary}" TextColor="#000000" FontAttributes="Bold" CornerRadius="8" HeightRequest="50" Margin="0,20,0,0"/>
+
+                <Button Text="🗑️ Eliminar / Cancelar Viaje" Command="{Binding EliminarViajeCommand}" BackgroundColor="Transparent" TextColor="{StaticResource Error}" BorderColor="{StaticResource Error}" BorderWidth="1" FontAttributes="Bold" CornerRadius="8" HeightRequest="50" Margin="0,5,0,0"/>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <ActivityIndicator IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}" Color="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" WidthRequest="50" HeightRequest="50"/>
+    </Grid>
+</ContentPage>

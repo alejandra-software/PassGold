@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:GoldeenRide.Helpers"
+             x:Class="GoldeenRide.Views.ActiveTripPage"
+             xmlns:viewmodels="clr-namespace:GoldeenRide.ViewModels"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="{AppThemeBinding Light=#F5F7FA, Dark=#121212}">
+
+    <ContentPage.BindingContext>
+        <viewmodels:ActiveTripViewModel />
+    </ContentPage.BindingContext>
+
+    <Grid RowDefinitions="4*, 6*">
+
+        <Border Grid.Row="0" BackgroundColor="{AppThemeBinding Light=#E0E0E0, Dark=#2A2A2A}" StrokeThickness="0">
+            <Grid>
+                <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="10">
+                    <Label Text="🗺️" FontSize="50" HorizontalOptions="Center"/>
+                    <Label Text="{helpers:Translate ActiveTrip_MapPlaceholder}" FontSize="16" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#888888, Dark=#AAAAAA}"/>
+                </VerticalStackLayout>
+
+                <ImageButton HorizontalOptions="Start" VerticalOptions="Start" Margin="15,40,0,0" WidthRequest="40" HeightRequest="40" BackgroundColor="#88000000" CornerRadius="20" Command="{Binding GoBackCommand}">
+                    <ImageButton.Source>
+                        <FontImageSource FontFamily="OpenSansBold" Glyph="←" Color="#FFFFFF" Size="20"/>
+                    </ImageButton.Source>
+                </ImageButton>
+
+                <Border HorizontalOptions="End" VerticalOptions="Start" Margin="15,40,15,0" BackgroundColor="{AppThemeBinding Light=#DDFFFFFF, Dark=#DD1E1E1E}" Padding="10" StrokeShape="RoundRectangle 8" StrokeThickness="0">
+                    <VerticalStackLayout Spacing="5">
+                        <HorizontalStackLayout Spacing="5">
+                            <Label Text="🔵" FontSize="10" VerticalOptions="Center"/>
+                            <Label Text="{helpers:Translate ActiveTrip_Pickup}" FontSize="11" FontAttributes="Bold"/>
+                        </HorizontalStackLayout>
+                        <HorizontalStackLayout Spacing="5">
+                            <Label Text="🔴" FontSize="10" VerticalOptions="Center"/>
+                            <Label Text="{helpers:Translate ActiveTrip_AltDropoff}" FontSize="11" FontAttributes="Bold"/>
+                        </HorizontalStackLayout>
+                        <HorizontalStackLayout Spacing="5">
+                            <Label Text="🛑" FontSize="10" VerticalOptions="Center"/>
+                            <Label Text="{helpers:Translate ActiveTrip_Destination}" FontSize="11" FontAttributes="Bold"/>
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1" StrokeShape="RoundRectangle 25,25,0,0" BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#121212}" StrokeThickness="0" Margin="0,-25,0,0">
+            <Grid RowDefinitions="Auto, *, Auto">
+
+                <VerticalStackLayout Grid.Row="0" Padding="20,15,20,10">
+                    <BoxView HeightRequest="5" WidthRequest="50" Color="{AppThemeBinding Light=#CCCCCC, Dark=#444444}" CornerRadius="2" HorizontalOptions="Center"/>
+
+                    <Grid ColumnDefinitions="*, Auto" Margin="0,15,0,0">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="{Binding TituloRuta}" FontSize="18" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}"/>
+                            <Label Text="{Binding PasajerosPendientes, StringFormat='{0}'}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+                        </VerticalStackLayout>
+
+                        <Button Grid.Column="1" Text="{helpers:Translate ActiveTrip_ViewAll}" BackgroundColor="Transparent" TextColor="{StaticResource Primary}" FontAttributes="Bold" Padding="0"/>
+                    </Grid>
+                </VerticalStackLayout>
+
+                <ScrollView Grid.Row="1" Padding="20,5">
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding PasajerosDelViaje}" Spacing="12">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate>
+                                <Border Stroke="{Binding YaAbordo, Converter={StaticResource BoolToColorConverter}, ConverterParameter='Primary|#DDDDDD'}" StrokeThickness="2" StrokeShape="RoundRectangle 12" BackgroundColor="{AppThemeBinding Light=#FAFAFA, Dark=#1E1E1E}" Padding="15">
+                                    <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="15">
+
+                                        <Border Grid.Column="0" WidthRequest="50" HeightRequest="50" StrokeShape="RoundRectangle 25" BackgroundColor="{AppThemeBinding Light=#EEEEEE, Dark=#333333}" StrokeThickness="0">
+                                            <Grid>
+                                                <Label Text="👤" HorizontalOptions="Center" VerticalOptions="Center" FontSize="24" TextColor="#999999"/>
+                                            </Grid>
+                                        </Border>
+
+                                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="4">
+                                            <Label Text="{Binding NombreEstudiante}" FontAttributes="Bold" FontSize="16" TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}"/>
+
+                                            <HorizontalStackLayout Spacing="5">
+                                                <Label Text="🔵" FontSize="10" VerticalOptions="Center"/>
+                                                <Label Text="{Binding PuntoRecogida}" FontSize="12" TextColor="{AppThemeBinding Light=#555555, Dark=#AAAAAA}" LineBreakMode="TailTruncation"/>
+                                            </HorizontalStackLayout>
+
+                                            <HorizontalStackLayout Spacing="5" IsVisible="{Binding TieneBajadaAlterna}">
+                                                <Label Text="🔴" FontSize="10" VerticalOptions="Center"/>
+                                                <Label Text="{Binding PuntoBajada}" FontSize="12" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#8B0000, Dark=#FF6666}" LineBreakMode="TailTruncation"/>
+                                            </HorizontalStackLayout>
+                                        </VerticalStackLayout>
+
+                                        <CheckBox Grid.Column="2" VerticalOptions="Center" Color="{StaticResource Primary}" IsChecked="{Binding YaAbordo}" WidthRequest="40" HeightRequest="40"/>
+
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </ScrollView>
+
+                <Button Grid.Row="2" Text="{helpers:Translate ActiveTrip_FinishBtn}" Command="{Binding FinalizarViajeCommand}" Margin="20,10,20,20" HeightRequest="50" CornerRadius="10" FontAttributes="Bold" BackgroundColor="{AppThemeBinding Light=#333333, Dark=#E0E0E0}" TextColor="{AppThemeBinding Light=#FFFFFF, Dark=#000000}"/>
+
+            </Grid>
+        </Border>
+
+        <ActivityIndicator Grid.RowSpan="2" IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}" Color="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" WidthRequest="60" HeightRequest="60"/>
+    </Grid>
+</ContentPage>

@@ -28,5 +28,22 @@
 	</array>
 	<key>XSAppIconAssets</key>
 	<string>Assets.xcassets/appicon.appiconset</string>
+
+	<!-- INICIO CONFIGURACIÓN LOGIN SOCIAL (GOOGLE/APPLE) -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>GoldeenRide Auth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>goldeenride</string>
+			</array>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+		</dict>
+	</array>
+	<!-- FIN CONFIGURACIÓN LOGIN SOCIAL -->
+
 </dict>
 </plist>

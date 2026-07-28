@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:GoldeenRide.Helpers"
+             x:Class="GoldeenRide.Views.TripDetailsPage"
+             Title="{helpers:Translate TripDetails_Title}"
+             BackgroundColor="{AppThemeBinding Light=#F5F7FA, Dark=#121212}">
+
+    <Grid RowDefinitions="Auto, Auto, *">
+
+        <VerticalStackLayout Grid.Row="0" Margin="20,20,20,10" Spacing="10">
+            <Label Text="{helpers:Translate TripDetails_LogisticsTitle}" FontSize="22" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#333333, Dark=#FFFFFF}"/>
+
+            <Label Text="Toda la flota desplegada en este horario:" FontSize="12" TextColor="Gray" IsVisible="{Binding HayMultiplesChoferes}"/>
+            <Border IsVisible="{Binding HayMultiplesChoferes}" Stroke="{StaticResource Primary}" StrokeThickness="1" StrokeShape="RoundRectangle 8" BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}">
+                <Picker ItemsSource="{Binding ChoferesAsignados}" 
+                        ItemDisplayBinding="{Binding DisplayName}" 
+                        SelectedItem="{Binding ChoferSeleccionado}" 
+                        Title="{helpers:Translate TripDetails_SelectDriver}" 
+                        Margin="10,0" TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}"/>
+            </Border>
+        </VerticalStackLayout>
+
+        <Grid Grid.Row="1" ColumnDefinitions="*, *, *" Margin="20,10" ColumnSpacing="5">
+            <Button Grid.Column="0" Text="{helpers:Translate TripDetails_TabPassengers}" Command="{Binding CambiarPestanaCommand}" CommandParameter="Pasajeros" 
+                    BackgroundColor="{Binding IsPasajerosTab, Converter={StaticResource BoolToColorConverter}, ConverterParameter='Primary|Transparent'}" 
+                    TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}" CornerRadius="8" FontSize="12" FontAttributes="Bold" Padding="0"/>
+
+            <Button Grid.Column="1" Text="{helpers:Translate TripDetails_TabMap}" Command="{Binding CambiarPestanaCommand}" CommandParameter="Mapa" 
+                    BackgroundColor="{Binding IsMapaTab, Converter={StaticResource BoolToColorConverter}, ConverterParameter='Primary|Transparent'}" 
+                    TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}" CornerRadius="8" FontSize="12" FontAttributes="Bold" Padding="0"/>
+
+            <Button Grid.Column="2" Text="{helpers:Translate TripDetails_TabOperator}" Command="{Binding CambiarPestanaCommand}" CommandParameter="Operador" 
+                    BackgroundColor="{Binding IsOperadorTab, Converter={StaticResource BoolToColorConverter}, ConverterParameter='Primary|Transparent'}" 
+                    TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}" CornerRadius="8" FontSize="12" FontAttributes="Bold" Padding="0"/>
+        </Grid>
+
+        <!-- CONTENEDOR DESLIZABLE (SWIPE) -->
+        <Grid Grid.Row="2" Margin="20,10">
+            <Grid.GestureRecognizers>
+                <SwipeGestureRecognizer Direction="Left" Command="{Binding SwipeLeftCommand}" />
+                <SwipeGestureRecognizer Direction="Right" Command="{Binding SwipeRightCommand}" />
+            </Grid.GestureRecognizers>
+
+            <ScrollView IsVisible="{Binding IsPasajerosTab}">
+                <VerticalStackLayout Spacing="10" Padding="0,0,0,20">
+                    <Label Text="{helpers:Translate TripDetails_BoardingList}" FontSize="16" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#333333, Dark=#FFFFFF}"/>
+                    <Label IsVisible="{Binding ListaVacia}" Text="{helpers:Translate TripDetails_NoPassengers}" TextColor="Gray" HorizontalOptions="Center" Margin="0,20"/>
+
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Pasajeros}" Spacing="10">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate>
+                                <Border StrokeShape="RoundRectangle 8" BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}" Padding="15,10" StrokeThickness="0">
+                                    <Grid ColumnDefinitions="Auto, *" ColumnSpacing="15">
+                                        <Border Grid.Column="0" WidthRequest="45" HeightRequest="45" StrokeShape="RoundRectangle 22.5" BackgroundColor="#E0E0E0" StrokeThickness="0">
+                                            <Label Text="🎓" HorizontalOptions="Center" VerticalOptions="Center" FontSize="18"/>
+                                        </Border>
+                                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                            <Label Text="{Binding Nombre}" FontAttributes="Bold" FontSize="15" TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}"/>
+                                            <Label Text="{Binding Ubicacion}" FontSize="12" TextColor="Gray"/>
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <Grid IsVisible="{Binding IsMapaTab}" RowDefinitions="Auto, *">
+                <Label Grid.Row="0" Text="{helpers:Translate TripDetails_RealTimeRoute}" FontSize="16" FontAttributes="Bold" Margin="0,0,0,10" TextColor="{AppThemeBinding Light=#333333, Dark=#FFFFFF}"/>
+                <Border Grid.Row="1" StrokeShape="RoundRectangle 12" BackgroundColor="{AppThemeBinding Light=#EAEAEA, Dark=#2A2A2A}" StrokeThickness="0">
+                    <Label Text="{helpers:Translate TripDetails_MapPlaceholder}" HorizontalOptions="Center" VerticalOptions="Center" TextColor="Gray"/>
+                </Border>
+            </Grid>
+
+            <ScrollView IsVisible="{Binding IsOperadorTab}">
+                <VerticalStackLayout Spacing="15">
+                    <Label Text="{helpers:Translate TripDetails_UnitData}" FontSize="16" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#333333, Dark=#FFFFFF}"/>
+
+                    <Border StrokeShape="RoundRectangle 12" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}" Padding="15">
+                        <Grid ColumnDefinitions="Auto, *" ColumnSpacing="15">
+                            <Border Grid.Column="0" WidthRequest="60" HeightRequest="60" StrokeShape="RoundRectangle 30" BackgroundColor="#E0E0E0" StrokeThickness="0">
+                                <Label Text="👤" HorizontalOptions="Center" VerticalOptions="Center" FontSize="24"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                <Label Text="{helpers:Translate TripDetails_AssignedDriver}" FontSize="12" TextColor="Gray"/>
+                                <Label Text="{Binding NombreChofer}" FontSize="16" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+
+                    <Border StrokeShape="RoundRectangle 12" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}" Padding="15">
+                        <Grid ColumnDefinitions="Auto, *" ColumnSpacing="15">
+                            <Border Grid.Column="0" WidthRequest="60" HeightRequest="60" StrokeShape="RoundRectangle 10" BackgroundColor="#E0E0E0" StrokeThickness="0">
+                                <Label Text="🚐" HorizontalOptions="Center" VerticalOptions="Center" FontSize="24"/>
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                <Label Text="{helpers:Translate TripDetails_TransportUnit}" FontSize="12" TextColor="Gray"/>
+                                <Label Text="{Binding PlacaVehiculo}" FontSize="16" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}"/>
+                                <Label Text="{Binding CapacidadVehiculo, StringFormat='Capacidad Max: {0} personas'}" FontSize="12" TextColor="Gray"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+                </VerticalStackLayout>
+            </ScrollView>
+
+        </Grid>
+    </Grid>
+</ContentPage>

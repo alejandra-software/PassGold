@@ -19,6 +19,12 @@ public partial class AppShellViewModel : ObservableObject
     [ObservableProperty] private bool isJefe = false;
     [ObservableProperty] private bool isEmpleado = false;
     [ObservableProperty] private bool isIndependiente = false;
+    [ObservableProperty] private bool isPasajero = false;
+
+    // ✅ NUEVO: propiedad calculada. La usamos en el flyout para mostrar
+    // "Administrar Flota / Mis Vehículos" a cualquiera que tenga vehículos propios
+    // (jefe o independiente), pero NUNCA a empleado ni pasajero.
+    public bool CanManageFleet => IsJefe || IsIndependiente;
 
     [ObservableProperty] private FlyoutBehavior flyoutState = FlyoutBehavior.Disabled;
 
@@ -36,10 +42,12 @@ public partial class AppShellViewModel : ObservableObject
                 UserRole = data.Rol.ToUpper();
                 string rolLower = data.Rol.ToLower();
 
-                
                 IsJefe = rolLower.Contains("jefe") || rolLower.Contains("owner");
                 IsEmpleado = rolLower.Contains("empleado");
                 IsIndependiente = rolLower.Contains("independiente") || rolLower.Contains("independent");
+                IsPasajero = rolLower.Contains("pasajero") || rolLower.Contains("passenger");
+
+                OnPropertyChanged(nameof(CanManageFleet));
 
                 IsLogged = true;
                 FlyoutState = FlyoutBehavior.Flyout;
@@ -51,16 +59,19 @@ public partial class AppShellViewModel : ObservableObject
 
     public void ResetMenu()
     {
-        IsLogged = false; IsJefe = false; IsEmpleado = false; IsIndependiente = false;
+        IsLogged = false; IsJefe = false; IsEmpleado = false; IsIndependiente = false; IsPasajero = false;
         FlyoutState = FlyoutBehavior.Disabled;
         UserName = "Invitado"; UserRole = ""; UserEmail = "";
+        OnPropertyChanged(nameof(CanManageFleet));
     }
 
     [RelayCommand]
     public async Task GoToHomeAsync()
     {
         Shell.Current.FlyoutIsPresented = false;
-        await Shell.Current.GoToAsync("///driver-dashboard");
+        // ✅ FIX: antes siempre mandaba a driver-dashboard, incluso a pasajeros.
+        string destino = IsPasajero ? "///passenger-dashboard" : "///driver-dashboard";
+        await Shell.Current.GoToAsync(destino);
     }
 
     [RelayCommand]
