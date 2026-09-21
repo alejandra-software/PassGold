@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:PassGold.Helpers"
+             x:Class="PassGold.Views.RegisterStep2Page"
+             Title="{helpers:Translate RegisterStep2Title}"
+             Shell.TabBarIsVisible="False">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24,20,24,36" Spacing="16">
+
+            <!-- Progreso -->
+            <VerticalStackLayout Spacing="6" Margin="0,0,0,10">
+                <Label Text="{helpers:Translate RegisterStep2Subtitle}" FontSize="13" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                <ProgressBar Progress="1.0" HeightRequest="4" ProgressColor="{StaticResource Primary}" BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}"/>
+            </VerticalStackLayout>
+
+            <!-- Nombre -->
+            <VerticalStackLayout Spacing="6">
+                <Label Text="{helpers:Translate RegisterStep2Name}" FontSize="13" FontAttributes="Bold"/>
+                <Border BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}"
+                        Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}"
+                        StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="4,0">
+                    <Entry Text="{Binding RegisterName, Mode=TwoWay}" Placeholder="{helpers:Translate RegisterStep2NameHint}" FontSize="14"/>
+                </Border>
+            </VerticalStackLayout>
+
+            <!-- Selección de Rol -->
+            <VerticalStackLayout Spacing="8" RadioButtonGroup.GroupName="UserRole" RadioButtonGroup.SelectedValue="{Binding SelectedRole, Mode=TwoWay}">
+                <Label Text="{helpers:Translate RegisterStep2UserType}" FontSize="13" FontAttributes="Bold"/>
+
+                <Border Padding="12,8" StrokeShape="RoundRectangle 8" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}">
+                    <RadioButton Content="{helpers:Translate RegisterStep2RolePassenger}" Value="pasajero" FontSize="14"/>
+                </Border>
+
+                <Border Padding="12,8" StrokeShape="RoundRectangle 8" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}">
+                    <RadioButton Content="{helpers:Translate RegisterStep2RoleDriverOwner}" Value="chofer_jefe" FontSize="14"/>
+                </Border>
+
+                <Border Padding="12,8" StrokeShape="RoundRectangle 8" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}">
+                    <RadioButton Content="{helpers:Translate RegisterStep2RoleDriverEmployee}" Value="chofer_empleado" FontSize="14"/>
+                </Border>
+
+                <Border Padding="12,8" StrokeShape="RoundRectangle 8" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}">
+                    <RadioButton Content="{helpers:Translate RegisterStep2RoleDriverIndependent}" Value="chofer_independiente" FontSize="14"/>
+                </Border>
+            </VerticalStackLayout>
+
+            <!-- Foto -->
+            <VerticalStackLayout Spacing="8">
+                <Label Text="{helpers:Translate RegisterStep2Photo}" FontSize="13" FontAttributes="Bold"/>
+                <Button Text="{helpers:Translate RegisterStep2PhotoButton}" Command="{Binding PickPhotoCommand}" BackgroundColor="{AppThemeBinding Light={StaticResource LightButtonSec}, Dark={StaticResource DarkButtonSec}}"
+                        TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" FontSize="14" CornerRadius="8"/>
+                <Label Text="{helpers:Translate RegisterStep2PhotoOptional}" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                <Label Text="{Binding RegisterPhotoPath}" IsVisible="{Binding RegisterPhotoPath, Converter={StaticResource StringToBoolConverter}}" FontSize="11" TextColor="{StaticResource Primary}"/>
+            </VerticalStackLayout>
+
+            <Label Text="{Binding RegisterStep2ErrorMessage}" IsVisible="{Binding RegisterStep2ErrorMessage, Converter={StaticResource StringToBoolConverter}}" TextColor="{StaticResource Error}" FontSize="12"/>
+
+            <!-- Completar -->
+            <Button Text="{helpers:Translate RegisterStep2RegisterButton}" Command="{Binding RegisterStep2CompleteCommand}" BackgroundColor="{StaticResource Primary}" TextColor="White" Padding="0,14" CornerRadius="8" FontSize="16" FontAttributes="Bold"
+                    IsEnabled="{Binding IsRegisterStep2Loading, Converter={StaticResource InvertedBoolConverter}}" Margin="0,8,0,0"/>
+
+            <ActivityIndicator IsRunning="{Binding IsRegisterStep2Loading}" IsVisible="{Binding IsRegisterStep2Loading}" Color="{StaticResource Primary}"/>
+
+            <!-- Atrás -->
+            <Button Text="{helpers:Translate RegisterStep2BackButton}" Command="{Binding RegisterStep2BackCommand}" BackgroundColor="{AppThemeBinding Light={StaticResource LightButtonSec}, Dark={StaticResource DarkButtonSec}}"
+                    TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" FontSize="14" CornerRadius="8" IsEnabled="{Binding IsRegisterStep2Loading, Converter={StaticResource InvertedBoolConverter}}"/>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

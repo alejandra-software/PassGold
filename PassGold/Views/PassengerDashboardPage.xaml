@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:PassGold.Helpers"
+             xmlns:maps="clr-namespace:Microsoft.Maui.Controls.Maps;assembly=Microsoft.Maui.Controls.Maps"
+             x:Class="PassGold.Views.PassengerDashboardPage"
+             xmlns:viewmodels="clr-namespace:PassGold.ViewModels"
+             Shell.NavBarIsVisible="True"
+             Title="Mi Panel"
+             BackgroundColor="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}">
+
+    <Grid RowDefinitions="Auto, Auto, *">
+        <Grid Grid.Row="0" ColumnDefinitions="Auto, *" Padding="20,20,20,10" ColumnSpacing="15">
+            <Border Grid.Column="0" WidthRequest="50" HeightRequest="50" StrokeShape="RoundRectangle 25" StrokeThickness="0" BackgroundColor="{StaticResource Primary}">
+                <Grid>
+                    <Label Text="🎓" FontSize="24" HorizontalOptions="Center" VerticalOptions="Center" IsVisible="{Binding HasFotoPerfilUsuario, Converter={StaticResource InvertedBoolConverter}}"/>
+                    <Image Source="{Binding FotoPerfilUsuario}" Aspect="AspectFill" IsVisible="{Binding HasFotoPerfilUsuario}"/>
+                </Grid>
+            </Border>
+            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                <Label Text="{helpers:Translate PassengerDash_Hello}" FontSize="14" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                <Label Text="{Binding StudentName}" FontSize="18" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+            </VerticalStackLayout>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnDefinitions="*, *" Margin="20,10" BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}">
+            <Button Grid.Column="0" Text="📅 Mi Horario" BackgroundColor="{StaticResource Primary}" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" CornerRadius="0" FontAttributes="Bold" IsEnabled="False"/>
+            <Button Grid.Column="1" Text="🔍 Buscar Flotas" Clicked="BuscarFlotas_Clicked" BackgroundColor="Transparent" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" CornerRadius="0" FontAttributes="Bold"/>
+        </Grid>
+
+        <Grid Grid.Row="2" VerticalOptions="Fill">
+            <Grid RowDefinitions="Auto, Auto, *">
+                <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto" Margin="10,0,10,10">
+                    <Button Grid.Column="0" Text="◀" Command="{Binding RetrocederSemanaCommand}" BackgroundColor="Transparent" TextColor="{StaticResource Primary}" FontSize="20"/>
+                    <VerticalStackLayout Grid.Column="1" HorizontalOptions="Center" VerticalOptions="Center">
+                        <Label Text="Semana Activa" FontAttributes="Bold" FontSize="15" HorizontalOptions="Center"/>
+                        <Label Text="{Binding TextoRangoFechas}" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource LightHint}, Dark={StaticResource DarkHint}}" HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+                    <Button Grid.Column="2" Text="▶" Command="{Binding AvanzarSemanaCommand}" BackgroundColor="Transparent" TextColor="{StaticResource Primary}" FontSize="20"/>
+                </Grid>
+
+                <Label Grid.Row="1" IsVisible="{Binding IsMyScheduleEmpty}" Text="Aún no tienes viajes programados." HorizontalOptions="Center" VerticalOptions="Center" Margin="0,40" TextColor="{AppThemeBinding Light={StaticResource LightHint}, Dark={StaticResource DarkHint}}"/>
+
+                <ScrollView Grid.Row="2" VerticalOptions="Fill">
+                    <Grid IsVisible="{Binding IsMyScheduleEmpty, Converter={StaticResource InvertedBoolConverter}}" ColumnDefinitions="75, *" Padding="10">
+                        <VerticalStackLayout Grid.Column="0" Spacing="5" Margin="0,45,0,0" BindableLayout.ItemsSource="{Binding TramosMiHorario}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <Border HeightRequest="130" BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeThickness="0" StrokeShape="RoundRectangle 8,0,0,8" Padding="5">
+                                        <Label Text="{Binding HoraFija}" FontSize="11" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}" HorizontalOptions="Center" VerticalOptions="Center" HorizontalTextAlignment="Center"/>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <ScrollView Grid.Column="1" Orientation="Horizontal" HorizontalScrollBarVisibility="Always">
+                            <VerticalStackLayout Spacing="5">
+                                <HorizontalStackLayout Spacing="5" BindableLayout.ItemsSource="{Binding CabecerasDias}" HeightRequest="45">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border WidthRequest="180" HeightRequest="45" BackgroundColor="{StaticResource Primary}" StrokeShape="RoundRectangle 8" Padding="5,0" StrokeThickness="0">
+                                                <Label Text="{Binding .}" TextColor="#000000" FontAttributes="Bold" FontSize="13" HorizontalOptions="Center" VerticalOptions="Center" HorizontalTextAlignment="Center"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </HorizontalStackLayout>
+                                <VerticalStackLayout BindableLayout.ItemsSource="{Binding TramosMiHorario}" Spacing="5">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate>
+                                            <HorizontalStackLayout BindableLayout.ItemsSource="{Binding ReservasDeLaSemana}" Spacing="5">
+                                                <BindableLayout.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border WidthRequest="180" HeightRequest="130" StrokeShape="RoundRectangle 8" StrokeThickness="0">
+                                                            <Grid>
+                                                                <Border IsVisible="{Binding TieneViaje}" BackgroundColor="{Binding ColorFondo}" Padding="10" StrokeThickness="0">
+                                                                    <Grid RowDefinitions="Auto, *, Auto, Auto" RowSpacing="2">
+                                                                        <Label Grid.Row="0" Text="{Binding InfoFlota}" FontAttributes="Bold" FontSize="12" TextColor="White" HorizontalOptions="Center"/>
+                                                                        <BoxView Grid.Row="1" HeightRequest="1" Color="#55FFFFFF" Margin="0,2"/>
+                                                                        <Label Grid.Row="2" Text="{Binding InfoTransporte}" FontSize="11" TextColor="White" HorizontalOptions="Center" HorizontalTextAlignment="Center"/>
+                                                                        <Button Grid.Row="3" Text="✖ Anular Viaje" Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PassengerDashboardViewModel}}, Path=CancelarMiReservaCommand}" CommandParameter="{Binding IdReserva}" HeightRequest="25" FontSize="10" CornerRadius="4" BackgroundColor="#E53935" TextColor="White" Padding="0" Margin="0,5,0,0"/>
+                                                                    </Grid>
+                                                                </Border>
+                                                                <Border IsVisible="{Binding TieneViaje, Converter={StaticResource InvertedBoolConverter}}" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" StrokeThickness="0" />
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </BindableLayout.ItemTemplate>
+                                            </HorizontalStackLayout>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </VerticalStackLayout>
+                            </VerticalStackLayout>
+                        </ScrollView>
+                    </Grid>
+                </ScrollView>
+            </Grid>
+        </Grid>
+
+        <ActivityIndicator Grid.RowSpan="3" IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}" Color="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" WidthRequest="50" HeightRequest="50"/>
+    </Grid>
+</ContentPage>

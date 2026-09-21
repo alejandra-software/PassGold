@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:maps="clr-namespace:Microsoft.Maui.Controls.Maps;assembly=Microsoft.Maui.Controls.Maps"
+             xmlns:helpers="clr-namespace:PassGold.Helpers"
+             x:Class="PassGold.Views.SetHomeLocationPage"
+             x:Name="RootPage"
+             Title="{helpers:Translate SetHome_Title}"
+             BackgroundColor="{AppThemeBinding Light=#F5F7FA, Dark=#121212}">
+
+    <Grid RowDefinitions="Auto, *, Auto">
+
+        <VerticalStackLayout Grid.Row="0" Padding="15,10" Spacing="8">
+            <Label Text="{helpers:Translate SetHome_Instructions}" FontSize="14" TextColor="{AppThemeBinding Light=#555, Dark=#CCC}"/>
+            <SearchBar x:Name="BuscadorCasa" Placeholder="Buscar dirección o punto de referencia..." SearchButtonPressed="BuscadorCasa_SearchButtonPressed"/>
+        </VerticalStackLayout>
+
+        <maps:Map x:Name="MapaCasa" Grid.Row="1" IsShowingUser="True" MapClicked="MapaCasa_MapClicked"/>
+
+        <Button Grid.Row="2" Margin="15" Text="{helpers:Translate SetHome_SaveBtn}"
+                Command="{Binding GuardarCasaCommand}"
+                IsEnabled="{Binding HayPinPuesto}"
+                BackgroundColor="{StaticResource Primary}" TextColor="Black" FontAttributes="Bold"
+                HeightRequest="50" CornerRadius="10"/>
+
+        <ActivityIndicator Grid.RowSpan="3" IsRunning="{Binding IsSaving}" IsVisible="{Binding IsSaving}"
+                            Color="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" WidthRequest="50" HeightRequest="50"/>
+    </Grid>
+</ContentPage>

@@ -1,6 +1,21 @@
 ﻿################################################################################
-# Este archivo .gitignore ha sido creado automáticamente por Microsoft(R) Visual Studio.
+# .gitignore para PassGold (.NET MAUI)
 ################################################################################
 
+# Visual Studio
 /.vs
-/GoldeenRide/obj
+*.user
+*.suo
+
+# Carpetas de build — nombre real del proyecto es "PassGold", no "GoldeenRide"
+# (la línea vieja apuntaba a una carpeta que ya no existe, esto la reemplaza)
+[Bb]in/
+[Oo]bj/
+
+# Rider / VS Code 
+.idea/
+*.DotSettings.user
+
+# macOS / Xcode 
+.DS_Store
+*.xcuserstate

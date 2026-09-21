@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:maps="clr-namespace:Microsoft.Maui.Controls.Maps;assembly=Microsoft.Maui.Controls.Maps"
+             xmlns:helpers="clr-namespace:PassGold.Helpers"
+             x:Class="PassGold.Views.PasajeroReservaPage"
+             Title="{helpers:Translate PassengerDash_BookSeat}"
+             BackgroundColor="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}">
+
+    <Grid RowDefinitions="Auto, *, Auto">
+
+        <!--  NUEVO: buscador gratuito (Geocoding del propio celular, sin API key) -->
+        <Border Grid.Row="0" Margin="15,10" Stroke="{StaticResource Primary}" StrokeShape="RoundRectangle 25" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}">
+            <SearchBar x:Name="BuscadorPasajero"
+                       Placeholder="{helpers:Translate Schedule_MapSearchPlaceholder}"
+                       SearchButtonPressed="BuscadorPasajero_SearchButtonPressed"
+                       BackgroundColor="Transparent" />
+        </Border>
+
+        <!-- MAPA -->
+        <Grid Grid.Row="1">
+            <maps:Map x:Name="MapaPasajero" 
+                      MapType="{Binding CurrentMapType}"
+                      MapClicked="MapaPasajero_MapClicked"
+                      IsShowingUser="True" />
+
+            <Button Text="🛰️" Command="{Binding ToggleMapTypeCommand}" HorizontalOptions="Start" VerticalOptions="Start" Margin="10,10,0,0" WidthRequest="44" HeightRequest="44" CornerRadius="22" Padding="0" BackgroundColor="#CC000000" FontSize="20"/>
+
+            <!--  NUEVO: leyenda fija — como el color real del pin nativo no se puede
+                 controlar de forma confiable entre Android/iOS, esta leyenda es lo que
+                 hace el mapa entendible sin tener que tocar cada pin para saber qué es. -->
+            <Border HorizontalOptions="End" VerticalOptions="Start" Margin="10" Padding="10,8" 
+                    BackgroundColor="#DD1E1E1E" StrokeThickness="0" StrokeShape="RoundRectangle 10">
+                <VerticalStackLayout Spacing="4">
+                    <HorizontalStackLayout Spacing="6">
+                        <Label Text="🚩" FontSize="14"/>
+                        <Label Text="{helpers:Translate Map_LegendMeta}" FontSize="11" TextColor="White"/>
+                    </HorizontalStackLayout>
+                    <HorizontalStackLayout Spacing="6">
+                        <Label Text="🟢" FontSize="14"/>
+                        <Label Text="{helpers:Translate Map_LegendPickup}" FontSize="11" TextColor="White"/>
+                    </HorizontalStackLayout>
+                    <HorizontalStackLayout Spacing="6">
+                        <Label Text="🔵" FontSize="14"/>
+                        <Label Text="{helpers:Translate Map_LegendDropoff}" FontSize="11" TextColor="White"/>
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+
+        <!-- PANEL DE CONTROL -->
+        <Border Grid.Row="2" 
+                StrokeShape="RoundRectangle 20,20,0,0" 
+                BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" 
+                Padding="20" 
+                Shadow="{Shadow Brush=Black, Offset='0,-2', Opacity=0.2}">
+
+            <VerticalStackLayout Spacing="15">
+                <Label Text="{helpers:Translate Map_ConfigureTrip}" FontSize="20" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" />
+
+                <!--  REDISEÑO: pestañas grandes tipo tab, igual de obvias que en la pantalla del chofer
+                     (antes eran 2 radio buttons chiquitos, poco visibles). -->
+                <Grid ColumnDefinitions="*, *" ColumnSpacing="8">
+                    <Button Grid.Column="0" Text="🟢" FontSize="22" Command="{Binding ActivarModoOrigenCommand}"
+                            BackgroundColor="{Binding SeleccionandoOrigen, Converter={StaticResource BoolToColorConverter}, ConverterParameter='Primary|Transparent'}"
+                            BorderColor="{AppThemeBinding Light=#2E7D32, Dark=#81C784}" BorderWidth="2"
+                            CornerRadius="10" HeightRequest="55"/>
+                    <Button Grid.Column="1" Text="🔵" FontSize="22" Command="{Binding ActivarModoDestinoCommand}"
+                            BackgroundColor="{Binding SeleccionandoOrigen, Converter={StaticResource BoolToColorConverter}, ConverterParameter='Transparent|Primary'}"
+                            BorderColor="{AppThemeBinding Light=#1565C0, Dark=#90CAF9}" BorderWidth="2"
+                            CornerRadius="10" HeightRequest="55"/>
+                </Grid>
+
+                <VerticalStackLayout>
+                    <Label Text="{Binding TituloRecogida}" IsVisible="{Binding SeleccionandoOrigen}" FontAttributes="Bold" FontSize="15" TextColor="{AppThemeBinding Light=#2E7D32, Dark=#81C784}"/>
+                    <Label Text="{Binding TextoRecogida}" IsVisible="{Binding SeleccionandoOrigen}" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                    <Label Text="{Binding TituloBajada}" IsVisible="{Binding SeleccionandoOrigen, Converter={StaticResource InvertedBoolConverter}}" FontAttributes="Bold" FontSize="15" TextColor="{AppThemeBinding Light=#1565C0, Dark=#90CAF9}"/>
+                    <Label Text="{Binding TextoBajada}" IsVisible="{Binding SeleccionandoOrigen, Converter={StaticResource InvertedBoolConverter}}" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                </VerticalStackLayout>
+
+                <Button Text="{helpers:Translate Map_ConfirmBooking}" 
+                        Command="{Binding ConfirmarReservaDesdeMapaCommand}"
+                        BackgroundColor="{StaticResource Primary}" 
+                        TextColor="Black" 
+                        FontAttributes="Bold" 
+                        CornerRadius="10" 
+                        HeightRequest="50"/>
+            </VerticalStackLayout>
+        </Border>
+    </Grid>
+</ContentPage>

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:PassGold.Helpers"
+             x:Class="PassGold.Views.LoginPage"
+             Shell.NavBarIsVisible="False">
+
+    <Grid RowDefinitions="*, Auto">
+
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Padding="24,48,24,24" Spacing="16">
+
+                <VerticalStackLayout Spacing="8" HorizontalOptions="Center" Margin="0,20,0,36">
+                    <Label Text="🔑" FontSize="56" HorizontalOptions="Center"/>
+                    <Label Text="{helpers:Translate AppTitle}" FontSize="28" FontAttributes="Bold" HorizontalOptions="Center"/>
+                    <Label Text="{helpers:Translate AppSubtitle}" FontSize="14"
+                           TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"
+                           HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+
+                <!-- Email -->
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="{helpers:Translate LoginEmail}" FontSize="13" FontAttributes="Bold"/>
+                    <Border BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}"
+                            Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}"
+                            StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="4,0">
+                        <Entry Text="{Binding LoginEmail}" Placeholder="{helpers:Translate LoginEmail}" Keyboard="Email" FontSize="14"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <!-- Contraseña -->
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="{helpers:Translate LoginPassword}" FontSize="13" FontAttributes="Bold"/>
+                    <Border BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}"
+                            Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}"
+                            StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="4,0">
+                        <Grid ColumnDefinitions="*, 44">
+                            <Entry Grid.Column="0" Text="{Binding LoginPassword}" IsPassword="{Binding IsLoginPasswordHidden}" Placeholder="{helpers:Translate LoginPassword}" FontSize="14"/>
+                            <Label Grid.Column="1" Text="{Binding LoginPasswordEyeIcon}" FontSize="22" VerticalOptions="Center" HorizontalOptions="Center"
+                                   TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}">
+                                <Label.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding ToggleLoginPasswordCommand}"/>
+                                </Label.GestureRecognizers>
+                            </Label>
+                        </Grid>
+                    </Border>
+                </VerticalStackLayout>
+
+                <Label Text="{Binding LoginErrorMessage}" IsVisible="{Binding LoginErrorMessage, Converter={StaticResource StringToBoolConverter}}" TextColor="{StaticResource Error}" FontSize="12"/>
+
+                <Button Text="{helpers:Translate LoginButton}" Command="{Binding LoginCommand}" BackgroundColor="{StaticResource Primary}" TextColor="White" Padding="0,14" CornerRadius="8" FontSize="16" FontAttributes="Bold"
+                        IsEnabled="{Binding IsLoginLoading, Converter={StaticResource InvertedBoolConverter}}" Margin="0,8,0,0"/>
+
+                <!-- NUEVO: Redes Sociales -->
+                <VerticalStackLayout Spacing="10" Margin="0,15,0,0">
+                    <Label Text="O ingresa rápidamente con" HorizontalOptions="Center" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <Button Grid.Column="0" Text="Google" Command="{Binding LoginWithGoogleCommand}" BackgroundColor="#DB4437" TextColor="White" CornerRadius="8" FontAttributes="Bold" IsEnabled="{Binding IsLoginLoading, Converter={StaticResource InvertedBoolConverter}}"/>
+                        <Button Grid.Column="1" Text="Apple" Command="{Binding LoginWithAppleCommand}" BackgroundColor="Black" TextColor="White" CornerRadius="8" FontAttributes="Bold" IsEnabled="{Binding IsLoginLoading, Converter={StaticResource InvertedBoolConverter}}"/>
+                    </Grid>
+                </VerticalStackLayout>
+
+                <ActivityIndicator IsRunning="{Binding IsLoginLoading}" IsVisible="{Binding IsLoginLoading}" Color="{StaticResource Primary}"/>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <VerticalStackLayout Grid.Row="1" Padding="24,12,24,36" Spacing="10" BackgroundColor="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}">
+            <BoxView HeightRequest="1" Margin="0,0,0,4"/>
+            <Label Text="{helpers:Translate LoginNoAccount}" FontSize="13" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}" HorizontalOptions="Center"/>
+            <Button Text="{helpers:Translate RegisterStep1Title}" Command="{Binding GoToRegisterCommand}" BackgroundColor="{StaticResource SecondaryBlue}" TextColor="White" Padding="0,13" CornerRadius="8" FontSize="14" FontAttributes="Bold"/>
+        </VerticalStackLayout>
+
+    </Grid>
+</ContentPage>

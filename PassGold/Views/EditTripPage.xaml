@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:PassGold.ViewModels"
+             xmlns:helpers="clr-namespace:PassGold.Helpers"
+             xmlns:maps="clr-namespace:Microsoft.Maui.Controls.Maps;assembly=Microsoft.Maui.Controls.Maps"
+             x:Class="PassGold.Views.EditTripPage"
+             Title="Editar Programación"
+             BackgroundColor="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}">
+
+    <ContentPage.BindingContext>
+        <viewmodels:EditTripViewModel />
+    </ContentPage.BindingContext>
+
+    <Grid>
+        <ScrollView>
+            <VerticalStackLayout Padding="20" Spacing="20">
+
+                <Border IsVisible="{Binding IsFleetManager, Converter={StaticResource InvertedBoolConverter}}"
+                        Stroke="{StaticResource Error}" StrokeThickness="2" StrokeShape="RoundRectangle 8" BackgroundColor="{AppThemeBinding Light=#FFEBEB, Dark=#3A1C1C}" Padding="15">
+                    <VerticalStackLayout Spacing="5">
+                        <Label Text="🔒 Solo Lectura" FontAttributes="Bold" TextColor="{StaticResource Error}"/>
+                        <Label Text="Solo el Chofer Jefe o Independiente puede modificar o cancelar viajes programados." FontSize="13" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="Clasificación del Viaje" FontSize="13" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                    <Border Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeShape="RoundRectangle 8" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}">
+                        <Picker ItemsSource="{Binding TiposViaje}" SelectedItem="{Binding SelectedTipoViaje}" IsEnabled="{Binding IsFleetManager}" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="{helpers:Translate Schedule_WaypointsTitle}" FontSize="13" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                    <Border Stroke="{StaticResource Secondary}" StrokeThickness="1" StrokeShape="RoundRectangle 8" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Padding="15">
+                        <VerticalStackLayout Spacing="10">
+
+                            <Border IsVisible="{Binding HasDestinosFrecuentes}" Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeShape="RoundRectangle 8" BackgroundColor="Transparent">
+                                <Picker Title="📍 Elegir destino frecuente..." 
+                                        ItemsSource="{Binding DestinosFrecuentes}" 
+                                        ItemDisplayBinding="{Binding Alias}" 
+                                        SelectedItem="{Binding DestinoFrecuenteSeleccionado}" 
+                                        TextColor="{StaticResource Primary}" FontAttributes="Bold"/>
+                            </Border>
+
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding MetasDelViaje}" Spacing="5" IsVisible="{Binding HasMetas}">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10">
+                                            <Label Grid.Column="0" Text="📍" VerticalOptions="Center"/>
+                                            <Label Grid.Column="1" Text="{Binding Alias}" VerticalOptions="Center" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                                            <ImageButton Grid.Column="2" Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditTripViewModel}}, Path=EliminarMetaCommand}" CommandParameter="{Binding .}" BackgroundColor="Transparent" HeightRequest="24" WidthRequest="24">
+                                                <ImageButton.Source>
+                                                    <FontImageSource FontFamily="OpenSansRegular" Glyph="✕" Color="{StaticResource Error}"/>
+                                                </ImageButton.Source>
+                                            </ImageButton>
+                                        </Grid>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+
+                            <!--  FIX: Botón de mapa adaptado a modo oscuro para que sea visible -->
+                            <Button Text="{helpers:Translate Schedule_AddWaypointBtn}" Command="{Binding AbrirMapaMetasCommand}" BackgroundColor="Transparent" TextColor="{AppThemeBinding Light=#1565C0, Dark=#90CAF9}" FontAttributes="Bold" />
+                        </VerticalStackLayout>
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="¿Para cuándo aplica este cambio?" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                    <Border Stroke="{StaticResource Primary}" StrokeShape="RoundRectangle 8" Padding="10,0" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}">
+                        <Picker ItemsSource="{Binding OpcionesAlcance}" SelectedItem="{Binding AlcanceSeleccionado}" IsEnabled="{Binding IsFleetManager}" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="Hora Oficial de Salida" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                    <Border Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeShape="RoundRectangle 8" Padding="10,0" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}">
+                        <TimePicker Time="{Binding NuevaHora}" IsEnabled="{Binding IsFleetManager}" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" FontAttributes="Bold"/>
+                    </Border>
+                </VerticalStackLayout>
+
+                <Border Stroke="{StaticResource Secondary}" StrokeThickness="1" StrokeShape="RoundRectangle 8" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Padding="15">
+                    <VerticalStackLayout Spacing="5">
+                        <Label Text="Ventana real de ejecución:" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}" FontAttributes="Italic"/>
+                        <Grid ColumnDefinitions="*,*">
+                            <VerticalStackLayout Grid.Column="0">
+                                <Label Text="Inicio real" FontSize="11" TextColor="{StaticResource Primary}" FontAttributes="Bold"/>
+                                <TimePicker Time="{Binding HoraInicioRecorrido}" IsEnabled="{Binding IsFleetManager}" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" FontSize="13"/>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1">
+                                <Label Text="Llegada real aprox." FontSize="11" TextColor="{StaticResource Primary}" FontAttributes="Bold"/>
+                                <TimePicker Time="{Binding HoraLlegadaDestino}" IsEnabled="{Binding IsFleetManager}" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" FontSize="13"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Label Text="Asignación de Unidad Principal" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="Chofer Asignado" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                    <CollectionView ItemsSource="{Binding ChoferesActivos}" SelectionMode="Single" SelectedItem="{Binding NuevoChofer, Mode=TwoWay}" IsEnabled="{Binding IsFleetManager}" HeightRequest="92">
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Horizontal" ItemSpacing="8"/>
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border StrokeShape="RoundRectangle 12" Padding="8" WidthRequest="76"
+                                        Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}">
+                                    <VisualStateManager.VisualStateGroups>
+                                        <VisualStateGroup x:Name="CommonStates">
+                                            <VisualState x:Name="Normal"/>
+                                            <VisualState x:Name="Selected">
+                                                <VisualState.Setters>
+                                                    <Setter Property="Stroke" Value="{StaticResource Primary}"/>
+                                                    <Setter Property="StrokeThickness" Value="3"/>
+                                                </VisualState.Setters>
+                                            </VisualState>
+                                        </VisualStateGroup>
+                                    </VisualStateManager.VisualStateGroups>
+                                    <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
+                                        <Border StrokeShape="RoundRectangle 24" WidthRequest="48" HeightRequest="48" StrokeThickness="0" HorizontalOptions="Center"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}">
+                                            <Grid>
+                                                <Label Text="👤" FontSize="20" HorizontalOptions="Center" VerticalOptions="Center" IsVisible="{Binding FotoPerfil, Converter={StaticResource StringToBoolInvertedConverter}}"/>
+                                                <Image Source="{Binding FotoPerfil}" Aspect="AspectFill" IsVisible="{Binding FotoPerfil, Converter={StaticResource StringToBoolConverter}}"/>
+                                            </Grid>
+                                        </Border>
+                                        <Label Text="{Binding Nombre}" FontSize="10" HorizontalTextAlignment="Center" LineBreakMode="TailTruncation" MaxLines="1" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="Microbús" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                    <CollectionView ItemsSource="{Binding VehiculosActivos}" SelectionMode="Single" SelectedItem="{Binding NuevoVehiculo, Mode=TwoWay}" IsEnabled="{Binding IsFleetManager}" HeightRequest="92">
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Horizontal" ItemSpacing="8"/>
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border StrokeShape="RoundRectangle 12" Padding="8" WidthRequest="76"
+                                        Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}">
+                                    <VisualStateManager.VisualStateGroups>
+                                        <VisualStateGroup x:Name="CommonStates">
+                                            <VisualState x:Name="Normal"/>
+                                            <VisualState x:Name="Selected">
+                                                <VisualState.Setters>
+                                                    <Setter Property="Stroke" Value="{StaticResource Primary}"/>
+                                                    <Setter Property="StrokeThickness" Value="3"/>
+                                                </VisualState.Setters>
+                                            </VisualState>
+                                        </VisualStateGroup>
+                                    </VisualStateManager.VisualStateGroups>
+                                    <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
+                                        <Border StrokeShape="RoundRectangle 8" WidthRequest="48" HeightRequest="48" StrokeThickness="0" HorizontalOptions="Center"
+                                                BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}">
+                                            <Grid>
+                                                <Label Text="🚐" FontSize="20" HorizontalOptions="Center" VerticalOptions="Center" IsVisible="{Binding FotoUrl, Converter={StaticResource StringToBoolInvertedConverter}}"/>
+                                                <Image Source="{Binding FotoUrl}" Aspect="AspectFill" IsVisible="{Binding FotoUrl, Converter={StaticResource StringToBoolConverter}}"/>
+                                            </Grid>
+                                        </Border>
+                                        <Label Text="{Binding Placa}" FontSize="10" HorizontalTextAlignment="Center" LineBreakMode="TailTruncation" MaxLines="1" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding MicrobusesDeApoyo}" Spacing="10">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate>
+                            <Border Stroke="{StaticResource Primary}" StrokeShape="RoundRectangle 8" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Padding="10">
+                                <Grid RowDefinitions="Auto, Auto" ColumnDefinitions="*, Auto" RowSpacing="8">
+                                    <Label Grid.Row="0" Grid.Column="0" Text="Microbús de apoyo" FontSize="12" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}" VerticalOptions="Center"/>
+                                    <ImageButton Grid.Row="0" Grid.Column="1" VerticalOptions="Center" WidthRequest="24" HeightRequest="24" Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditTripViewModel}}, Path=QuitarMicrobusApoyoCommand}" CommandParameter="{Binding .}">
+                                        <ImageButton.Source>
+                                            <FontImageSource FontFamily="OpenSansRegular" Glyph="✕" Color="{StaticResource Error}"/>
+                                        </ImageButton.Source>
+                                    </ImageButton>
+
+                                    <Grid Grid.Row="1" Grid.ColumnSpan="2" ColumnDefinitions="*, *" ColumnSpacing="10">
+                                        <CollectionView Grid.Column="0" ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditTripViewModel}}, Path=ChoferesActivos}" SelectionMode="Single" SelectedItem="{Binding Chofer, Mode=TwoWay}" HeightRequest="86">
+                                            <CollectionView.ItemsLayout>
+                                                <LinearItemsLayout Orientation="Horizontal" ItemSpacing="6"/>
+                                            </CollectionView.ItemsLayout>
+                                            <CollectionView.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border StrokeShape="RoundRectangle 10" Padding="6" WidthRequest="66"
+                                                            Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}"
+                                                            BackgroundColor="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}">
+                                                        <VisualStateManager.VisualStateGroups>
+                                                            <VisualStateGroup x:Name="CommonStates">
+                                                                <VisualState x:Name="Normal"/>
+                                                                <VisualState x:Name="Selected">
+                                                                    <VisualState.Setters>
+                                                                        <Setter Property="Stroke" Value="{StaticResource Primary}"/>
+                                                                        <Setter Property="StrokeThickness" Value="3"/>
+                                                                    </VisualState.Setters>
+                                                                </VisualState>
+                                                            </VisualStateGroup>
+                                                        </VisualStateManager.VisualStateGroups>
+                                                        <VerticalStackLayout Spacing="3" HorizontalOptions="Center">
+                                                            <Border StrokeShape="RoundRectangle 20" WidthRequest="40" HeightRequest="40" StrokeThickness="0" HorizontalOptions="Center"
+                                                                    BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}">
+                                                                <Grid>
+                                                                    <Label Text="👤" FontSize="16" HorizontalOptions="Center" VerticalOptions="Center" IsVisible="{Binding FotoPerfil, Converter={StaticResource StringToBoolInvertedConverter}}"/>
+                                                                    <Image Source="{Binding FotoPerfil}" Aspect="AspectFill" IsVisible="{Binding FotoPerfil, Converter={StaticResource StringToBoolConverter}}"/>
+                                                                </Grid>
+                                                            </Border>
+                                                            <Label Text="{Binding Nombre}" FontSize="9" HorizontalTextAlignment="Center" LineBreakMode="TailTruncation" MaxLines="1" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                                                        </VerticalStackLayout>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </CollectionView.ItemTemplate>
+                                        </CollectionView>
+
+                                        <CollectionView Grid.Column="1" ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:EditTripViewModel}}, Path=VehiculosActivos}" SelectionMode="Single" SelectedItem="{Binding Vehiculo, Mode=TwoWay}" HeightRequest="86">
+                                            <CollectionView.ItemsLayout>
+                                                <LinearItemsLayout Orientation="Horizontal" ItemSpacing="6"/>
+                                            </CollectionView.ItemsLayout>
+                                            <CollectionView.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border StrokeShape="RoundRectangle 10" Padding="6" WidthRequest="66"
+                                                            Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}"
+                                                            BackgroundColor="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}">
+                                                        <VisualStateManager.VisualStateGroups>
+                                                            <VisualStateGroup x:Name="CommonStates">
+                                                                <VisualState x:Name="Normal"/>
+                                                                <VisualState x:Name="Selected">
+                                                                    <VisualState.Setters>
+                                                                        <Setter Property="Stroke" Value="{StaticResource Primary}"/>
+                                                                        <Setter Property="StrokeThickness" Value="3"/>
+                                                                    </VisualState.Setters>
+                                                                </VisualState>
+                                                            </VisualStateGroup>
+                                                        </VisualStateManager.VisualStateGroups>
+                                                        <VerticalStackLayout Spacing="3" HorizontalOptions="Center">
+                                                            <Border StrokeShape="RoundRectangle 6" WidthRequest="40" HeightRequest="40" StrokeThickness="0" HorizontalOptions="Center"
+                                                                    BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}">
+                                                                <Grid>
+                                                                    <Label Text="🚐" FontSize="16" HorizontalOptions="Center" VerticalOptions="Center" IsVisible="{Binding FotoUrl, Converter={StaticResource StringToBoolInvertedConverter}}"/>
+                                                                    <Image Source="{Binding FotoUrl}" Aspect="AspectFill" IsVisible="{Binding FotoUrl, Converter={StaticResource StringToBoolConverter}}"/>
+                                                                </Grid>
+                                                            </Border>
+                                                            <Label Text="{Binding Placa}" FontSize="9" HorizontalTextAlignment="Center" LineBreakMode="TailTruncation" MaxLines="1" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                                                        </VerticalStackLayout>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </CollectionView.ItemTemplate>
+                                        </CollectionView>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+
+                <Button Text="🚐 Añadir Microbús de Apoyo" Command="{Binding AgregarMicrobusApoyoCommand}" IsVisible="{Binding IsFleetManager}" BackgroundColor="Transparent" TextColor="{AppThemeBinding Light=#1565C0, Dark=#90CAF9}" BorderColor="{StaticResource Primary}" BorderWidth="1" CornerRadius="8" HeightRequest="40" Margin="0,5"/>
+
+                <Button Text="Guardar Cambios" Command="{Binding GuardarCambiosCommand}" IsVisible="{Binding IsFleetManager}" BackgroundColor="{StaticResource Primary}" TextColor="Black" FontAttributes="Bold" CornerRadius="8" HeightRequest="50" Margin="0,20,0,0"/>
+
+                <Button Text="🗑️ Eliminar / Cancelar Viaje" Command="{Binding EliminarViajeCommand}" IsVisible="{Binding IsFleetManager}" BackgroundColor="Transparent" TextColor="{StaticResource Error}" BorderColor="{StaticResource Error}" BorderWidth="1" FontAttributes="Bold" CornerRadius="8" HeightRequest="50" Margin="0,5,0,0"/>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <Grid IsVisible="{Binding IsMapModalVisible}" BackgroundColor="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}" RowDefinitions="Auto, *, Auto">
+            <Grid Grid.Row="0" ColumnDefinitions="Auto, *" Padding="15" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}">
+                <ImageButton Grid.Column="0" Command="{Binding CerrarMapaCommand}" BackgroundColor="Transparent" WidthRequest="40" HeightRequest="40">
+                    <ImageButton.Source>
+                        <FontImageSource FontFamily="OpenSansRegular" Glyph="✕" Color="{AppThemeBinding Light=#1565C0, Dark=#90CAF9}"/>
+                    </ImageButton.Source>
+                </ImageButton>
+                <Label Grid.Column="1" Text="{helpers:Translate Schedule_MapModalTitle}" FontSize="16" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#1565C0, Dark=#90CAF9}" VerticalOptions="Center"/>
+            </Grid>
+
+            <Grid Grid.Row="1" RowDefinitions="Auto, *">
+                <Border Grid.Row="0" Margin="15,10" Stroke="{StaticResource Primary}" StrokeShape="RoundRectangle 25" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}">
+                    <SearchBar x:Name="BuscadorMetas" Placeholder="{helpers:Translate Schedule_MapSearchPlaceholder}" SearchButtonPressed="BuscadorMetas_SearchButtonPressed" BackgroundColor="Transparent" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                </Border>
+                <maps:Map x:Name="MapaDestinosOficial" Grid.Row="1" MapType="{Binding CurrentMapType}" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" IsShowingUser="True" />
+                <Label Grid.Row="1" Text="🎯" FontSize="40" HorizontalOptions="Center" VerticalOptions="Center" InputTransparent="True"/>
+                <Button Grid.Row="1" Text="🛰️" Command="{Binding ToggleMapTypeCommand}" HorizontalOptions="End" VerticalOptions="Start" Margin="0,10,10,0" WidthRequest="44" HeightRequest="44" CornerRadius="22" Padding="0" BackgroundColor="#CC000000" FontSize="20"/>
+            </Grid>
+
+            <VerticalStackLayout Grid.Row="2" Padding="20" Spacing="15" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}">
+                <Label Text="{helpers:Translate Schedule_MapAliasPrompt}" FontSize="14" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                <Border Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeShape="RoundRectangle 8" Padding="10,0">
+                    <Entry Text="{Binding NuevoAliasPunto}" Placeholder="{helpers:Translate Schedule_MapAliasPlaceholder}" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" />
+                </Border>
+                <!--  FIX: Botón con contraste seguro en negro sobre primary -->
+                <Button Text="{helpers:Translate Schedule_MapConfirmBtn}" Command="{Binding ConfirmarPuntoMapaCommand}" BackgroundColor="{StaticResource Primary}" TextColor="Black" FontAttributes="Bold" HeightRequest="50" CornerRadius="8"/>
+            </VerticalStackLayout>
+        </Grid>
+
+        <ActivityIndicator IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}" Color="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" WidthRequest="50" HeightRequest="50"/>
+    </Grid>
+</ContentPage>

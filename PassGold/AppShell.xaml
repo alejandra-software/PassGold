@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell x:Class="PassGold.AppShell"
+       xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+       xmlns:views="clr-namespace:PassGold.Views"
+       xmlns:helpers="clr-namespace:PassGold.Helpers"
+       FlyoutBehavior="{Binding FlyoutState}"
+       FlyoutBackgroundColor="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}">
+
+    <Shell.Resources>
+        <Style TargetType="Button" x:Key="MenuBtnStyle">
+            <Setter Property="BackgroundColor" Value="Transparent" />
+            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" />
+            <Setter Property="HorizontalOptions" Value="Fill" />
+            <Setter Property="FontAttributes" Value="Bold" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="Padding" Value="20, 15" />
+        </Style>
+    </Shell.Resources>
+
+    <!-- Encabezado del Menú -->
+    <Shell.FlyoutHeader>
+        <VerticalStackLayout Padding="20,40,20,20" BackgroundColor="{StaticResource Primary}">
+            <Label Text=" YsO" FontSize="40"/>
+            <Label Text="{helpers:Translate AppTitle}" FontSize="20" FontAttributes="Bold" TextColor="#000000"/>
+        </VerticalStackLayout>
+    </Shell.FlyoutHeader>
+
+    <Shell.FlyoutContent>
+        <ScrollView>
+            <VerticalStackLayout Padding="0,20" Spacing="5">
+
+                <Button Text="{helpers:Translate MenuHome}" Command="{Binding GoToHomeCommand}" Style="{StaticResource MenuBtnStyle}"/>
+
+                <!-- DIRECTORIO Y NORMAS (Pasajeros) -->
+                <!--  FIX: antes esto era solo para pasajeros (IsVisible="{Binding
+                     IsPasajero}"). Ahora cualquier rol puede entrar a ver el
+                     directorio de flotas — FleetProfilePage se encarga de ocultar
+                     el botón de "Ver Horarios" (reservar) cuando quien mira es un
+                     chofer, así que acá no hace falta restringir nada. -->
+                <Button Text="{helpers:Translate PassengerDash_DirectoryTitle}" 
+                        Clicked="MenuNavegar_Clicked" 
+                        CommandParameter="fleet-directory" 
+                        Style="{StaticResource MenuBtnStyle}"/>
+
+                <Button Text="{helpers:Translate Rules_Btn}" 
+                        Clicked="MenuNavegar_Clicked" 
+                        CommandParameter="passenger-rules" 
+                        Style="{StaticResource MenuBtnStyle}" 
+                        IsVisible="{Binding IsPasajero}"/>
+
+                <!-- PROGRAMAR VIAJES (Jefes) -->
+                <Button Text="{helpers:Translate MenuSchedule}" Command="{Binding GoToScheduleTripCommand}" Style="{StaticResource MenuBtnStyle}"
+                        IsVisible="{Binding CanManageFleet}"/>
+
+                <!-- ADMINISTRAR FLOTA (Choferes) -->
+                <Button Text="{helpers:Translate MenuAdminFleet}" Command="{Binding GoToAdminFleetCommand}" Style="{StaticResource MenuBtnStyle}"
+                        IsVisible="{Binding IsPasajero, Converter={StaticResource InvertedBoolConverter}}"/>
+
+                <Button Text="{helpers:Translate SettingsPageTitle}" Command="{Binding GoToSettingsCommand}" Style="{StaticResource MenuBtnStyle}"/>
+
+                <BoxView HeightRequest="1" Color="{AppThemeBinding Light={StaticResource LightDivider}, Dark={StaticResource DarkDivider}}" Margin="20,10"/>
+
+                <Button Text="{helpers:Translate SettingsLogoutBtn}" Clicked="MenuCerrarSesion_Clicked" Style="{StaticResource MenuBtnStyle}" TextColor="{StaticResource Error}"/>
+            </VerticalStackLayout>
+        </ScrollView>
+    </Shell.FlyoutContent>
+
+    <ShellContent Route="login" ContentTemplate="{DataTemplate views:LoginPage}" FlyoutItemIsVisible="False" />
+    <ShellContent Route="register-step1" ContentTemplate="{DataTemplate views:RegisterStep1Page}" FlyoutItemIsVisible="False" />
+    <ShellContent Route="register-step2" ContentTemplate="{DataTemplate views:RegisterStep2Page}" FlyoutItemIsVisible="False" />
+    <ShellContent Route="driver-dashboard" ContentTemplate="{DataTemplate views:DriverDashboardPage}" FlyoutItemIsVisible="False" />
+    <ShellContent Route="passenger-dashboard" ContentTemplate="{DataTemplate views:PassengerDashboardPage}" FlyoutItemIsVisible="False" />
+
+</Shell>

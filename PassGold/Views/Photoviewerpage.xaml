@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PassGold.Views.PhotoViewerPage"
+             BackgroundColor="Black"
+             Shell.NavBarIsVisible="False">
+
+    <Grid x:Name="RootGrid" BackgroundColor="Black">
+
+        <!-- La imagen centrada, con pinch (zoom) + pan (arrastrar) combinados -->
+        <Image x:Name="PhotoImage"
+               Aspect="AspectFit"
+               HorizontalOptions="Center"
+               VerticalOptions="Center">
+            <Image.GestureRecognizers>
+                <PinchGestureRecognizer PinchUpdated="OnPinchUpdated" />
+                <PanGestureRecognizer PanUpdated="OnPanUpdated" />
+                <TapGestureRecognizer NumberOfTapsRequired="2" Tapped="OnDoubleTapped" />
+            </Image.GestureRecognizers>
+        </Image>
+
+        <!-- Botón cerrar, arriba a la izquierda -->
+        <ImageButton HorizontalOptions="Start" VerticalOptions="Start"
+                     Margin="15,40,0,0" WidthRequest="44" HeightRequest="44"
+                     BackgroundColor="#88000000" CornerRadius="22"
+                     Clicked="CerrarBtn_Clicked">
+            <ImageButton.Source>
+                <FontImageSource FontFamily="OpenSansRegular" Glyph="✕" Color="White" Size="20"/>
+            </ImageButton.Source>
+        </ImageButton>
+
+        <ActivityIndicator x:Name="LoadingIndicator" IsRunning="True" IsVisible="True"
+                            Color="White" HorizontalOptions="Center" VerticalOptions="Center" />
+    </Grid>
+</ContentPage>

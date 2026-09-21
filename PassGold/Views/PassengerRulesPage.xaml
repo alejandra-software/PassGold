@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:PassGold.Helpers"
+             x:Class="PassGold.Views.PassengerRulesPage"
+             Title="{helpers:Translate Rules_Title}"
+             BackgroundColor="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="25">
+
+            <!-- Encabezado -->
+            <VerticalStackLayout Spacing="5" HorizontalOptions="Center">
+                <Label Text="�s-️" FontSize="50" HorizontalOptions="Center"/>
+                <Label Text="{helpers:Translate Rules_Title}" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="Center"/>
+                <Label Text="{helpers:Translate Rules_Subtitle}" FontSize="14" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}" HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+
+            <Border BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Stroke="{StaticResource Primary}" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="15">
+                <Label Text="{helpers:Translate Rules_Intro}" FontSize="14" FontAttributes="Italic" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" HorizontalTextAlignment="Center"/>
+            </Border>
+
+            <!-- Regla 1 -->
+            <VerticalStackLayout Spacing="5">
+                <Label Text="{helpers:Translate Rules_1_Title}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+                <Label Text="{helpers:Translate Rules_1_Desc}" FontSize="14" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                <BoxView HeightRequest="1" Color="{AppThemeBinding Light={StaticResource LightDivider}, Dark={StaticResource DarkDivider}}" Margin="0,10,0,0"/>
+            </VerticalStackLayout>
+
+            <!-- Regla 2 -->
+            <VerticalStackLayout Spacing="5">
+                <Label Text="{helpers:Translate Rules_2_Title}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Error}"/>
+                <Label Text="{helpers:Translate Rules_2_Desc}" FontSize="14" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                <BoxView HeightRequest="1" Color="{AppThemeBinding Light={StaticResource LightDivider}, Dark={StaticResource DarkDivider}}" Margin="0,10,0,0"/>
+            </VerticalStackLayout>
+
+            <!-- Regla 3 -->
+            <VerticalStackLayout Spacing="5">
+                <Label Text="{helpers:Translate Rules_3_Title}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+                <Label Text="{helpers:Translate Rules_3_Desc}" FontSize="14" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                <BoxView HeightRequest="1" Color="{AppThemeBinding Light={StaticResource LightDivider}, Dark={StaticResource DarkDivider}}" Margin="0,10,0,0"/>
+            </VerticalStackLayout>
+
+            <!-- Regla 4 -->
+            <VerticalStackLayout Spacing="5">
+                <Label Text="{helpers:Translate Rules_4_Title}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+                <Label Text="{helpers:Translate Rules_4_Desc}" FontSize="14" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:PassGold.Helpers"
+             x:Class="PassGold.Views.FleetProfilePage"
+             xmlns:viewmodels="clr-namespace:PassGold.ViewModels"
+             Shell.NavBarIsVisible="True"
+             Title="{Binding FlotaSeleccionada.NombreFlota}"
+             BackgroundColor="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}">
+
+    <Grid>
+        <ScrollView VerticalOptions="Fill">
+            <VerticalStackLayout Spacing="10" Padding="0,0,0,110">
+
+                <Grid HeightRequest="260">
+                    <Image Source="{Binding FlotaSeleccionada.FotoPortada}" 
+                           Aspect="AspectFill" 
+                           HeightRequest="200" 
+                           VerticalOptions="Start"
+                           BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}"/>
+
+                    <BoxView HeightRequest="200" VerticalOptions="Start" Color="#44000000" />
+
+                    <Border StrokeThickness="4" 
+                            Stroke="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}" 
+                            WidthRequest="110" HeightRequest="110" 
+                            StrokeShape="RoundRectangle 55" 
+                            HorizontalOptions="Start" 
+                            VerticalOptions="End" 
+                            Margin="20,0,0,0" 
+                            BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}">
+                        <Image Source="{Binding FlotaSeleccionada.FotoPerfil}" Aspect="AspectFill"/>
+                    </Border>
+                </Grid>
+
+                <VerticalStackLayout Padding="20,10" Spacing="5">
+                    <Label Text="{Binding FlotaSeleccionada.NombreFlota}" FontSize="24" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                    <Label Text="{Binding FlotaSeleccionada.Nombre, StringFormat={helpers:Translate PassengerDash_ManagedBy}}" FontSize="14" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+
+                    <FlexLayout BindableLayout.ItemsSource="{Binding ListaHashtags}" Wrap="Wrap" Margin="0,10,0,0">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate>
+                                <Border BackgroundColor="#E3F2FD" StrokeThickness="0" StrokeShape="RoundRectangle 8" Padding="10,4" Margin="0,0,8,8">
+                                    <Label Text="{Binding .}" FontSize="12" FontAttributes="Bold" TextColor="#1565C0"/>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </FlexLayout>
+                </VerticalStackLayout>
+
+                <Border StrokeThickness="0" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Padding="20">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="{helpers:Translate Profile_AboutUs}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+                        <Label IsVisible="{Binding HasBio}" Text="{Binding FlotaSeleccionada.DescripcionFlota}" FontSize="14" LineHeight="1.4" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                        <Label IsVisible="{Binding HasBio, Converter={StaticResource InvertedBoolConverter}}" Text="{helpers:Translate Profile_NoBio}" FontAttributes="Italic" FontSize="14" TextColor="{AppThemeBinding Light={StaticResource LightHint}, Dark={StaticResource DarkHint}}"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <VerticalStackLayout IsVisible="{Binding HasTeam}" Padding="20" Spacing="15">
+                    <Label Text="{helpers:Translate Profile_OurTeam}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+
+                    <ScrollView Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
+                        <HorizontalStackLayout BindableLayout.ItemsSource="{Binding EquipoFlota}" Spacing="15">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <VerticalStackLayout Spacing="5" WidthRequest="80">
+                                        <Border WidthRequest="60" HeightRequest="60" StrokeShape="RoundRectangle 30" StrokeThickness="2" Stroke="{StaticResource Primary}" BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" HorizontalOptions="Center">
+                                            <Image Source="{Binding FotoPerfil}" Aspect="AspectFill"/>
+                                        </Border>
+                                        <Label Text="{Binding Nombre}" FontSize="12" FontAttributes="Bold" HorizontalTextAlignment="Center" LineBreakMode="TailTruncation" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                                    </VerticalStackLayout>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </HorizontalStackLayout>
+                    </ScrollView>
+                </VerticalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!--  Solo el pasajero ve el botón de reservar. El chofer puede entrar a
+             este mismo perfil (directorio ahora abierto a todos) pero solo para
+             mirar — nada de "Ver Horarios" ni reservar nada. -->
+        <Border VerticalOptions="End" IsVisible="{Binding IsPasajero}" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Padding="20" StrokeThickness="0">
+            <Border.Shadow>
+                <Shadow Brush="Black" Offset="0,-2" Opacity="0.1" Radius="10"/>
+            </Border.Shadow>
+
+            <Button Text="{helpers:Translate Profile_ViewSchedulesBtn}" 
+                    Command="{Binding IrAHorariosCommand}" 
+                    BackgroundColor="{StaticResource Primary}" 
+                    TextColor="Black" 
+                    FontAttributes="Bold" 
+                    FontSize="16"
+                    CornerRadius="12" 
+                    HeightRequest="55"/>
+        </Border>
+
+        <ActivityIndicator IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}" Color="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" WidthRequest="50" HeightRequest="50"/>
+    </Grid>
+</ContentPage>

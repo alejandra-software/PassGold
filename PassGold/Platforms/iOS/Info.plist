@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UIDeviceFamily</key>
+	<array>
+		<integer>1</integer>
+		<integer>2</integer>
+	</array>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>XSAppIconAssets</key>
+	<string>Assets.xcassets/appicon.appiconset</string>
+
+	<!-- INICIO CONFIGURACIÓN LOGIN SOCIAL (GOOGLE/APPLE) -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>PassGold Auth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>goldeenride</string>
+			</array>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+		</dict>
+	</array>
+	<!-- FIN CONFIGURACIÓN LOGIN SOCIAL -->
+
+	<!-- Permiso obligatorio para mostrar el punto azul del usuario en Apple Maps -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>PassGold necesita acceder a tu ubicación para mostrar tu posición exacta en el mapa de tu universidad.</string>
+
+	<!-- 🆕 Sin esto, la app crashea apenas tocás "Cambiar Foto" (perfil, vehículo,
+	     o en el registro) — iOS mata la app al instante si falta la descripción,
+	     no muestra ningún diálogo de permiso como hace Android. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>PassGold necesita acceder a tus fotos para que puedas subir tu foto de perfil o la del microbús.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>PassGold necesita acceder a la cámara para que puedas tomar una foto de perfil o del microbús.</string>
+
+</dict>
+</plist>

@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:PassGold.Helpers"
+             xmlns:maps="clr-namespace:Microsoft.Maui.Controls.Maps;assembly=Microsoft.Maui.Controls.Maps"
+             x:Class="PassGold.Views.TripDetailsPage"
+             Title="{helpers:Translate TripDetails_Title}"
+             BackgroundColor="{AppThemeBinding Light=#F5F7FA, Dark=#121212}">
+
+    <!--  NUEVO: Grid raiz que permite superponer la vista de pantalla completa
+         encima de todo lo demas (titulo, pestañas, etc). -->
+    <Grid>
+
+        <Grid RowDefinitions="Auto, Auto, *">
+
+            <VerticalStackLayout Grid.Row="0" Margin="20,20,20,10" Spacing="10">
+                <Label Text="{helpers:Translate TripDetails_LogisticsTitle}" FontSize="22" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#333333, Dark=#FFFFFF}"/>
+
+                <Label Text="Toda la flota desplegada en este horario:" FontSize="12" TextColor="Gray" IsVisible="{Binding HayMultiplesChoferes}"/>
+                <Border IsVisible="{Binding HayMultiplesChoferes}" Stroke="{StaticResource Primary}" StrokeThickness="1" StrokeShape="RoundRectangle 8" BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}">
+                    <Picker ItemsSource="{Binding ChoferesAsignados}" 
+                        ItemDisplayBinding="{Binding DisplayName}" 
+                        SelectedItem="{Binding ChoferSeleccionado}" 
+                        Title="{helpers:Translate TripDetails_SelectDriver}" 
+                        Margin="10,0" TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}"/>
+                </Border>
+            </VerticalStackLayout>
+
+            <Grid Grid.Row="1" ColumnDefinitions="*, *, *" Margin="20,10" ColumnSpacing="5">
+                <Button Grid.Column="0" Text="{helpers:Translate TripDetails_TabPassengers}" Command="{Binding CambiarPestanaCommand}" CommandParameter="Pasajeros" 
+                    BackgroundColor="{Binding IsPasajerosTab, Converter={StaticResource BoolToColorConverter}, ConverterParameter='Primary|Transparent'}" 
+                    TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}" CornerRadius="8" FontSize="12" FontAttributes="Bold" Padding="0"/>
+
+                <Button Grid.Column="1" Text="{helpers:Translate TripDetails_TabMap}" Command="{Binding CambiarPestanaCommand}" CommandParameter="Mapa" 
+                    BackgroundColor="{Binding IsMapaTab, Converter={StaticResource BoolToColorConverter}, ConverterParameter='Primary|Transparent'}" 
+                    TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}" CornerRadius="8" FontSize="12" FontAttributes="Bold" Padding="0"/>
+
+                <Button Grid.Column="2" Text="{helpers:Translate TripDetails_TabOperator}" Command="{Binding CambiarPestanaCommand}" CommandParameter="Operador" 
+                    BackgroundColor="{Binding IsOperadorTab, Converter={StaticResource BoolToColorConverter}, ConverterParameter='Primary|Transparent'}" 
+                    TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}" CornerRadius="8" FontSize="12" FontAttributes="Bold" Padding="0"/>
+            </Grid>
+
+            <!-- CONTENEDOR DESLIZABLE (SWIPE) -->
+            <Grid Grid.Row="2" Margin="20,10">
+                <Grid.GestureRecognizers>
+                    <SwipeGestureRecognizer Direction="Left" Command="{Binding SwipeLeftCommand}" />
+                    <SwipeGestureRecognizer Direction="Right" Command="{Binding SwipeRightCommand}" />
+                </Grid.GestureRecognizers>
+
+                <ScrollView IsVisible="{Binding IsPasajerosTab}">
+                    <VerticalStackLayout Spacing="10" Padding="0,0,0,20">
+                        <Label Text="{helpers:Translate TripDetails_BoardingList}" FontSize="16" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#333333, Dark=#FFFFFF}"/>
+                        <Label IsVisible="{Binding ListaVacia}" Text="{helpers:Translate TripDetails_NoPassengers}" TextColor="Gray" HorizontalOptions="Center" Margin="0,20"/>
+
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Pasajeros}" Spacing="10">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <Border StrokeShape="RoundRectangle 8" BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}" Padding="15,10" StrokeThickness="0">
+                                        <Grid ColumnDefinitions="Auto, *" ColumnSpacing="15">
+                                            <Border Grid.Column="0" WidthRequest="45" HeightRequest="45" StrokeShape="RoundRectangle 22.5" BackgroundColor="#E0E0E0" StrokeThickness="0">
+                                                <Grid>
+                                                    <Label Text="🎓" HorizontalOptions="Center" VerticalOptions="Center" FontSize="18" IsVisible="{Binding FotoUrl, Converter={StaticResource StringToBoolInvertedConverter}}"/>
+                                                    <Image Source="{Binding FotoUrl}" Aspect="AspectFill" IsVisible="{Binding FotoUrl, Converter={StaticResource StringToBoolConverter}}"/>
+                                                </Grid>
+                                                <Border.GestureRecognizers>
+                                                    <TapGestureRecognizer Tapped="FotoPasajero_Tapped"/>
+                                                </Border.GestureRecognizers>
+                                            </Border>
+                                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                                <Label Text="{Binding Nombre}" FontAttributes="Bold" FontSize="15" TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}"/>
+                                                <Label Text="{Binding Ubicacion}" FontSize="12" TextColor="Gray"/>
+                                            </VerticalStackLayout>
+                                        </Grid>
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer Tapped="Pasajero_Tapped"/>
+                                        </Border.GestureRecognizers>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </ScrollView>
+
+                <Grid IsVisible="{Binding IsMapaTab}" RowDefinitions="Auto, Auto, *">
+                    <Label Grid.Row="0" Text="{helpers:Translate TripDetails_RealTimeRoute}" FontSize="16" FontAttributes="Bold" Margin="0,0,0,10" TextColor="{AppThemeBinding Light=#333333, Dark=#FFFFFF}"/>
+
+                    <!--  NUEVO: sub-pestañas Recogida / Bajada — cada una muestra SOLO sus pines,
+                     en vez de un solo mapa con todo revuelto (mucho mas facil de entender). -->
+                    <Grid Grid.Row="1" ColumnDefinitions="*, *" ColumnSpacing="5" Margin="0,0,0,10">
+                        <Button Grid.Column="0" Text="{helpers:Translate TripDetails_TabPickup}" Command="{Binding CambiarSubTabMapaCommand}" CommandParameter="Recogida"
+                            BackgroundColor="{Binding IsMapaSubTabRecogida, Converter={StaticResource BoolToColorConverter}, ConverterParameter='Primary|Transparent'}"
+                            TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}" CornerRadius="8" FontSize="12" FontAttributes="Bold" Padding="0"/>
+                        <Button Grid.Column="1" Text="{helpers:Translate TripDetails_TabDropoff}" Command="{Binding CambiarSubTabMapaCommand}" CommandParameter="Bajada"
+                            BackgroundColor="{Binding IsMapaSubTabRecogida, Converter={StaticResource BoolToColorConverter}, ConverterParameter='Transparent|Primary'}" 
+                            TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}" CornerRadius="8" FontSize="12" FontAttributes="Bold" Padding="0"/>
+                    </Grid>
+
+                    <!-- MAPA NATIVO (chico, dentro de la pestaña) -->
+                    <Grid Grid.Row="2">
+                        <Border StrokeShape="RoundRectangle 12" StrokeThickness="2" Stroke="{StaticResource Primary}" BackgroundColor="{AppThemeBinding Light=#EAEAEA, Dark=#2A2A2A}">
+                            <maps:Map x:Name="MapaRutaEnVivo" IsShowingUser="True" MapType="{Binding CurrentMapType}" />
+                        </Border>
+
+                        <!--  NUEVO: boton para expandir a pantalla completa -->
+                        <Button Text="⛶" FontSize="20" WidthRequest="45" HeightRequest="45" Padding="0"
+                            CornerRadius="22" BackgroundColor="#DD1E1E1E" TextColor="White"
+                            HorizontalOptions="End" VerticalOptions="Start" Margin="10"
+                            Clicked="AbrirPantallaCompleta_Clicked"/>
+
+                        <!-- 🆕 Vista satélite/híbrida -->
+                        <Button Text="🛰️" Command="{Binding ToggleMapTypeCommand}" FontSize="18" WidthRequest="45" HeightRequest="45" Padding="0"
+                            CornerRadius="22" BackgroundColor="#DD1E1E1E" TextColor="White"
+                            HorizontalOptions="Start" VerticalOptions="Start" Margin="10"/>
+                    </Grid>
+                </Grid>
+
+                <ScrollView IsVisible="{Binding IsOperadorTab}">
+                    <VerticalStackLayout Spacing="15">
+                        <Label Text="{helpers:Translate TripDetails_UnitData}" FontSize="16" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#333333, Dark=#FFFFFF}"/>
+
+                        <Border StrokeShape="RoundRectangle 12" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}" Padding="15">
+                            <Grid ColumnDefinitions="Auto, *" ColumnSpacing="15">
+                                <Border Grid.Column="0" WidthRequest="60" HeightRequest="60" StrokeShape="RoundRectangle 30" BackgroundColor="#E0E0E0" StrokeThickness="0">
+                                    <Grid>
+                                        <Label Text="👤" HorizontalOptions="Center" VerticalOptions="Center" FontSize="24" IsVisible="{Binding FotoChofer, Converter={StaticResource StringToBoolInvertedConverter}}"/>
+                                        <Image Source="{Binding FotoChofer}" Aspect="AspectFill" IsVisible="{Binding FotoChofer, Converter={StaticResource StringToBoolConverter}}"/>
+                                    </Grid>
+                                </Border>
+                                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                    <Label Text="{helpers:Translate TripDetails_AssignedDriver}" FontSize="12" TextColor="Gray"/>
+                                    <Label Text="{Binding NombreChofer}" FontSize="16" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}"/>
+                                </VerticalStackLayout>
+                            </Grid>
+                        </Border>
+
+                        <Border StrokeShape="RoundRectangle 12" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}" Padding="15">
+                            <Grid ColumnDefinitions="Auto, *" ColumnSpacing="15">
+                                <Border Grid.Column="0" WidthRequest="60" HeightRequest="60" StrokeShape="RoundRectangle 10" BackgroundColor="#E0E0E0" StrokeThickness="0">
+                                    <Grid>
+                                        <Label Text="🚐" HorizontalOptions="Center" VerticalOptions="Center" FontSize="24" IsVisible="{Binding FotoVehiculo, Converter={StaticResource StringToBoolInvertedConverter}}"/>
+                                        <Image Source="{Binding FotoVehiculo}" Aspect="AspectFill" IsVisible="{Binding FotoVehiculo, Converter={StaticResource StringToBoolConverter}}"/>
+                                    </Grid>
+                                </Border>
+                                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                    <Label Text="{helpers:Translate TripDetails_TransportUnit}" FontSize="12" TextColor="Gray"/>
+                                    <Label Text="{Binding PlacaVehiculo}" FontSize="16" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#000000, Dark=#FFFFFF}"/>
+                                    <Label Text="{Binding CapacidadVehiculo, StringFormat='Capacidad Max: {0} personas'}" FontSize="12" TextColor="Gray"/>
+                                </VerticalStackLayout>
+                            </Grid>
+                        </Border>
+                    </VerticalStackLayout>
+                </ScrollView>
+
+            </Grid>
+        </Grid>
+
+        <!--  NUEVO: PANTALLA COMPLETA — cubre TODO (titulo, pestañas, todo),
+         con su propio buscador de pasajeros/direcciones para no tener que
+         estirar el mapa a mano buscando un pin. -->
+        <Grid IsVisible="{Binding IsMapaPantallaCompleta}" RowDefinitions="Auto, *" BackgroundColor="{AppThemeBinding Light=#F5F7FA, Dark=#121212}">
+
+            <Border Grid.Row="0" Margin="15,15,15,10" Stroke="{StaticResource Primary}" StrokeShape="RoundRectangle 25" BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}">
+                <Grid ColumnDefinitions="*, Auto">
+                    <SearchBar Grid.Column="0" Placeholder="{helpers:Translate TripDetails_SearchPassengerPrompt}" 
+                           TextChanged="BuscadorPasajeros_TextChanged" BackgroundColor="Transparent"/>
+                    <Button Grid.Column="1" Text="✕" FontSize="18" WidthRequest="40" HeightRequest="40" Padding="0"
+                        BackgroundColor="Transparent" TextColor="{StaticResource Primary}" FontAttributes="Bold"
+                        Clicked="CerrarPantallaCompleta_Clicked"/>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1">
+                <maps:Map x:Name="MapaPantallaCompleta" IsShowingUser="True" MapType="{Binding CurrentMapType}" />
+                <Button Text="🛰️" Command="{Binding ToggleMapTypeCommand}" FontSize="18" WidthRequest="45" HeightRequest="45" Padding="0"
+                    CornerRadius="22" BackgroundColor="#DD1E1E1E" TextColor="White"
+                    HorizontalOptions="Start" VerticalOptions="Start" Margin="10"/>
+            </Grid>
+        </Grid>
+
+    </Grid>
+</ContentPage>
