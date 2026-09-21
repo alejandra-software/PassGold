@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:PassGold.Helpers"
+             x:Class="PassGold.Views.FleetDirectoryPage"
+             xmlns:viewmodels="clr-namespace:PassGold.ViewModels"
+             x:Name="DirectoryPage"
+             Shell.NavBarIsVisible="True"
+             Title="{helpers:Translate PassengerDash_DirectoryTitle}"
+             BackgroundColor="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}">
+
+    <ContentPage.BindingContext>
+        <viewmodels:FleetDirectoryViewModel />
+    </ContentPage.BindingContext>
+
+    <Grid RowDefinitions="Auto, *">
+        <SearchBar Grid.Row="0" Placeholder="Buscar flotas, ej: Santa Ana..." 
+                   Text="{Binding TextoBusqueda}" 
+                   SearchCommand="{Binding BuscarFlotasCommand}" 
+                   Margin="20,20,20,0"
+                   BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}"/>
+
+        <!--  FIX: antes este CollectionView estaba metido dentro de un ScrollView.
+             En iOS eso causa un bug conocido de .NET MAUI — el CollectionView ya
+             trae su propio scroll nativo (UICollectionView), y anidarlo dentro de
+             otro ScrollView hace que ambos entren en un ciclo de medición que no
+             siempre termina. Esto coincide exactamente con la pila de los crashes
+             que viste (_systemContentInsetIncludingAccessories, adjustedContentInset,
+             UICollectionView _updateVisibleCellsNow) — todo intentando calcularse
+             adentro del ScrollView padre, hasta que el sistema mata la app por
+             tardarse demasiado. Android lo toleraba casi siempre; iOS no. Ahora el
+             CollectionView llena directamente la fila que le queda del Grid, sin
+             ScrollView de por medio.
+        -->
+        <CollectionView Grid.Row="1" ItemsSource="{Binding FlotasDisponibles}" Margin="20,10,20,20">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Border Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeThickness="1" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" StrokeShape="RoundRectangle 12" Padding="15" Margin="0,0,0,15">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IrAPerfilFlotaCommand}" CommandParameter="{Binding .}"/>
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto, *, Auto">
+                            <Border Grid.Column="0" WidthRequest="60" HeightRequest="60" StrokeShape="RoundRectangle 30" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" VerticalOptions="Start" Margin="0,0,15,0" Padding="0">
+                                <Image Source="{Binding FotoPerfil}" Aspect="AspectFill" />
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Start" Spacing="5">
+                                <Label Text="{Binding NombreFlota}" FontSize="18" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                                <Label Text="{Binding NombreJefe, StringFormat={helpers:Translate PassengerDash_ManagedBy}}" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                                <Label Text="{helpers:Translate PassengerDash_CoveredRoutes}" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+                                <StackLayout BindableLayout.ItemsSource="{Binding RutasList}">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate>
+                                            <Label Text="{Binding StringFormat='📍 {0}'}" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" Margin="0,2"/>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </StackLayout>
+                            </VerticalStackLayout>
+                            <Label Grid.Column="2" Text="➡️" FontSize="20" VerticalOptions="Center" Margin="10,0,0,0"/>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <ActivityIndicator Grid.RowSpan="2" IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}" Color="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" WidthRequest="50" HeightRequest="50"/>
+    </Grid>
+</ContentPage>

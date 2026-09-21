@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:PassGold.Helpers"
+             x:Class="PassGold.Views.EditVehiclePage"
+             xmlns:viewmodels="clr-namespace:PassGold.ViewModels"
+             Title="{helpers:Translate EditVehicle_Title}"
+             BackgroundColor="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}">
+
+    <ContentPage.BindingContext>
+        <viewmodels:EditVehicleViewModel />
+    </ContentPage.BindingContext>
+
+    <Grid>
+        <ScrollView>
+            <VerticalStackLayout Padding="20" Spacing="25">
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="{helpers:Translate EditVehicle_Header}" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+                    <Label Text="{helpers:Translate EditVehicle_Desc}" FontSize="14" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="10" HorizontalOptions="Center" Margin="0,10">
+                    <Label Text="{helpers:Translate EditVehicle_PhotoLabel}" FontSize="13" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}" HorizontalOptions="Center"/>
+                    <Border WidthRequest="160" HeightRequest="120" StrokeShape="RoundRectangle 12" Stroke="{StaticResource Primary}" StrokeThickness="2" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Padding="0">
+                        <Grid>
+                            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="5" IsVisible="{Binding HasPhoto, Converter={StaticResource InvertedBoolConverter}}">
+                                <Label Text="📸" FontSize="30" HorizontalOptions="Center"/>
+                                <Label Text="{helpers:Translate RegisterStep2PhotoButton}" FontSize="12" TextColor="{StaticResource Primary}" HorizontalOptions="Center"/>
+                            </VerticalStackLayout>
+                            <Image Source="{Binding FotoUrl}" Aspect="AspectFill" IsVisible="{Binding HasPhoto}" />
+
+                            <!--  Lupa para ver en grande — solo aparece si ya hay foto -->
+                            <ImageButton HorizontalOptions="End" VerticalOptions="End" Margin="0,0,6,6"
+                                         WidthRequest="30" HeightRequest="30" CornerRadius="15"
+                                         BackgroundColor="#88000000" IsVisible="{Binding HasPhoto}"
+                                         Clicked="VerFotoGrande_Clicked">
+                                <ImageButton.Source>
+                                    <FontImageSource FontFamily="OpenSansRegular" Glyph="🔍" Color="White" Size="16"/>
+                                </ImageButton.Source>
+                            </ImageButton>
+                        </Grid>
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding PickPhotoCommand}" />
+                        </Border.GestureRecognizers>
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="{helpers:Translate AddVehiclePlateLabel}" FontSize="13" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                    <Border Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeShape="RoundRectangle 8" Padding="10,0">
+                        <Entry Text="{Binding Placa}" TextTransform="Uppercase" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" />
+                    </Border>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="{helpers:Translate AddVehicleCapacityLabel}" FontSize="13" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                    <Border Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeShape="RoundRectangle 8" Padding="10,0">
+                        <Entry Text="{Binding Capacidad}" Keyboard="Numeric" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" />
+                    </Border>
+                </VerticalStackLayout>
+
+                <Button Text="{helpers:Translate EditVehicle_SaveBtn}" Command="{Binding UpdateVehicleCommand}" BackgroundColor="{StaticResource Primary}" TextColor="#000000" FontAttributes="Bold" CornerRadius="8" HeightRequest="50" Margin="0,15,0,0"/>
+            </VerticalStackLayout>
+        </ScrollView>
+        <ActivityIndicator IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}" Color="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" WidthRequest="50" HeightRequest="50"/>
+    </Grid>
+</ContentPage>

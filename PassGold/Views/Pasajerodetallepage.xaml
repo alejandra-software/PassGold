@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:PassGold.Helpers"
+             x:Class="PassGold.Views.PasajeroDetallePage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}">
+
+    <Grid RowDefinitions="Auto, *" Padding="0,40,0,0">
+
+        <!-- Barra superior: solo el botón de cerrar, como en PhotoViewerPage -->
+        <Grid Grid.Row="0" Padding="15,0,15,10">
+            <ImageButton HorizontalOptions="Start" WidthRequest="40" HeightRequest="40"
+                         BackgroundColor="Transparent" Clicked="CerrarBtn_Clicked">
+                <ImageButton.Source>
+                    <FontImageSource FontFamily="OpenSansRegular" Glyph="✕"
+                                     Color="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" Size="22"/>
+                </ImageButton.Source>
+            </ImageButton>
+        </Grid>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="20" Padding="25,10,25,30">
+
+                <!-- Foto grande, tocable para verla en pantalla completa -->
+                <Border WidthRequest="140" HeightRequest="140" StrokeShape="RoundRectangle 70" StrokeThickness="0"
+                        BackgroundColor="{StaticResource Primary}" HorizontalOptions="Center">
+                    <Grid>
+                        <Label x:Name="IconoRespaldo" Text="🎓" FontSize="60" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Image x:Name="FotoGrande" Aspect="AspectFill"/>
+                    </Grid>
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="Foto_Tapped"/>
+                    </Border.GestureRecognizers>
+                </Border>
+
+                <Label x:Name="NombreLabel" FontSize="22" FontAttributes="Bold" HorizontalOptions="Center"
+                       TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+
+                <!-- Punto de recogida -->
+                <Border StrokeShape="RoundRectangle 12" StrokeThickness="0" Padding="15"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="{helpers:Translate PassengerDetail_Pickup}" FontSize="12" TextColor="Gray"/>
+                        <Label x:Name="UbicacionLabel" FontSize="15" FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Teléfono + botón de llamar (solo si hay número cargado) -->
+                <Border x:Name="TelefonoCard" StrokeShape="RoundRectangle 12" StrokeThickness="0" Padding="15"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}">
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="10">
+                        <VerticalStackLayout Grid.Column="0" Spacing="4" VerticalOptions="Center">
+                            <Label Text="Teléfono" FontSize="12" TextColor="Gray"/>
+                            <Label x:Name="TelefonoLabel" FontSize="15" FontAttributes="Bold"
+                                   TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                        </VerticalStackLayout>
+                        <Button Grid.Column="1" Text="{helpers:Translate PassengerDetail_Call}" Clicked="Llamar_Clicked"
+                                BackgroundColor="{StaticResource Primary}" TextColor="Black" FontAttributes="Bold"
+                                CornerRadius="8" Padding="14,8" VerticalOptions="Center"/>
+                    </Grid>
+                </Border>
+
+                <Label x:Name="SinTelefonoLabel" Text="{helpers:Translate PassengerDetail_NoPhone}" FontSize="13"
+                       TextColor="Gray" HorizontalTextAlignment="Center" IsVisible="False"/>
+
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>
