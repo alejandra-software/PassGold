@@ -3,113 +3,260 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:helpers="clr-namespace:PassGold.Helpers"
              x:Class="PassGold.Views.FleetSchedulePage"
-             x:Name="SchedulePage"
-             Title="{Binding SelectedFleetName}"
-             BackgroundColor="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}">
+             Title="{Binding TituloAgenda}"
+             BackgroundColor="{AppThemeBinding Light=#F5F7FA, Dark=#121212}">
 
-    <Grid RowDefinitions="Auto, *, Auto">
-        <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto" Margin="15,15,15,10">
-            <Button Grid.Column="0" Text="◀" Command="{Binding RetrocederSemanaCommand}" BackgroundColor="Transparent" TextColor="{StaticResource Primary}" FontSize="20"/>
-            <VerticalStackLayout Grid.Column="1" HorizontalOptions="Center" VerticalOptions="Center">
-                <Label Text="{helpers:Translate Dashboard_WeeklySchedule}" FontAttributes="Bold" FontSize="15" HorizontalOptions="Center"/>
-                <Label Text="{Binding TextoRangoFechas}" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource LightHint}, Dark={StaticResource DarkHint}}" HorizontalOptions="Center"/>
+    <!-- REDISEÑO: como los horarios que los choferes publican en WhatsApp.
+         - Una tira de días de las próximas 5 semanas (sin cambiar de semana con flechas).
+         - Por día, dos columnas: "Llegar a la U" y "Salir de la U".
+         - Si a una hora salen varios micros, al tocarla se despliegan para elegir chofer. -->
+    <Grid RowDefinitions="Auto, Auto, *, Auto">
+
+        <!-- ENCABEZADO -->
+        <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Padding="16,12,12,4" BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}">
+            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                <Label Text="{helpers:Translate FleetSched_Title}" FontAttributes="Bold" FontSize="16" TextColor="{AppThemeBinding Light=Black, Dark=White}"/>
+                <Label Text="{helpers:Translate FleetSched_Subtitle}" FontSize="12" TextColor="Gray"/>
             </VerticalStackLayout>
-            <Button Grid.Column="2" Text="▶" Command="{Binding AvanzarSemanaCommand}" BackgroundColor="Transparent" TextColor="{StaticResource Primary}" FontSize="20"/>
+            <!-- 🆕 Alternar entre la vista por día y la vista tipo horario de la universidad -->
+            <Button Grid.Column="1" Text="{Binding TextoBotonVista}" Command="{Binding CambiarVistaCommand}" VerticalOptions="Center"
+                    FontSize="12" Padding="10,0" HeightRequest="36" CornerRadius="18"
+                    BackgroundColor="Transparent" BorderColor="{StaticResource Primary}" BorderWidth="1" TextColor="{StaticResource Primary}"/>
         </Grid>
 
-        <ScrollView Grid.Row="1" VerticalOptions="Fill">
-            <Grid ColumnDefinitions="75, *" Padding="10">
-                <!--  PARCHE ANTIRRECORTER AQUÍ TAMBIÉN -->
-                <VerticalStackLayout Grid.Column="0" Spacing="5" Margin="0,45,0,0" BindableLayout.ItemsSource="{Binding TramosDelDia}" MinimumHeightRequest="3000">
-                    <BindableLayout.ItemTemplate>
-                        <DataTemplate>
-                            <Border HeightRequest="160" BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeThickness="0" StrokeShape="RoundRectangle 8,0,0,8" Padding="5">
-                                <Label Text="{Binding HoraFija}" FontSize="11" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}" HorizontalOptions="Center" VerticalOptions="Center" HorizontalTextAlignment="Center"/>
+        <!-- TIRA DE DÍAS (deslizar a la derecha para ver más semanas) -->
+        <ScrollView Grid.Row="1" Orientation="Horizontal" HorizontalScrollBarVisibility="Never" BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}" IsVisible="{Binding VistaPorDia}">
+            <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Dias}" Spacing="6" Padding="10,6,10,10">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate>
+                        <VerticalStackLayout Spacing="2">
+                            <Label Text="{Binding Mes}" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource Primary}" HeightRequest="15"/>
+                            <Border WidthRequest="50" HeightRequest="64" StrokeShape="RoundRectangle 12" StrokeThickness="0"
+                                    BackgroundColor="{Binding ColorFondo}" Opacity="{Binding Opacidad}">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding ElegirCommand}" CommandParameter="{Binding .}"/>
+                                </Border.GestureRecognizers>
+                                <VerticalStackLayout VerticalOptions="Center" Spacing="0">
+                                    <Label Text="{Binding Abrev}" FontSize="12" HorizontalOptions="Center" TextColor="{Binding ColorTexto}"/>
+                                    <Label Text="{Binding Numero}" FontSize="18" FontAttributes="Bold" HorizontalOptions="Center" TextColor="{Binding ColorTexto}"/>
+                                    <Label Text="{Binding TextoHoy}" FontSize="9" HorizontalOptions="Center" TextColor="{Binding ColorTexto}"/>
+                                    <Label Text="•" FontSize="14" HorizontalOptions="Center" Margin="0,-6,0,0" TextColor="{StaticResource Primary}" IsVisible="{Binding TieneSeleccion}"/>
+                                </VerticalStackLayout>
                             </Border>
-                        </DataTemplate>
-                    </BindableLayout.ItemTemplate>
-                </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </HorizontalStackLayout>
+        </ScrollView>
 
-                <ScrollView Grid.Column="1" Orientation="Horizontal" HorizontalScrollBarVisibility="Always">
-                    <VerticalStackLayout Spacing="5" MinimumHeightRequest="3000">
-                        <HorizontalStackLayout Spacing="5" BindableLayout.ItemsSource="{Binding CabecerasDias}" HeightRequest="45">
+        <!-- LLEGADAS / SALIDAS DEL DÍA ELEGIDO -->
+        <ScrollView Grid.Row="2" IsVisible="{Binding VistaPorDia}">
+            <VerticalStackLayout Padding="12,10" Spacing="10">
+
+                <Label Text="{Binding TituloDiaActivo}" FontSize="15" FontAttributes="Bold" TextColor="{AppThemeBinding Light=Black, Dark=White}"/>
+
+                <Label Text="{Binding MensajeSinViajes}" FontSize="14" HorizontalTextAlignment="Center" Margin="10,30" TextColor="Gray"
+                       IsVisible="{Binding DiaActivo.SinViajes}"/>
+
+                <Grid ColumnDefinitions="*, *" ColumnSpacing="10" IsVisible="{Binding DiaActivo.SinViajes, Converter={StaticResource InvertedBoolConverter}}">
+
+                    <!-- LLEGAR A LA U (ida) -->
+                    <VerticalStackLayout Grid.Column="0" Spacing="8">
+                        <Border BackgroundColor="#2E7D32" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="8,8">
+                            <Label Text="{helpers:Translate FleetSched_ArriveHeader}" FontAttributes="Bold" FontSize="14" TextColor="White" HorizontalOptions="Center"/>
+                        </Border>
+                        <Label Text="{helpers:Translate FleetSched_NoArrivals}" FontSize="12" TextColor="Gray" HorizontalOptions="Center" IsVisible="{Binding DiaActivo.SinLlegadas}"/>
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding DiaActivo.Llegadas}" Spacing="8">
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate>
-                                    <Border WidthRequest="180" HeightRequest="45" BackgroundColor="{StaticResource Primary}" StrokeShape="RoundRectangle 8" Padding="5,0" StrokeThickness="0">
-                                        <Label Text="{Binding .}" TextColor="#000000" FontAttributes="Bold" FontSize="13" HorizontalOptions="Center" VerticalOptions="Center"/>
-                                    </Border>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </HorizontalStackLayout>
-
-                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding TramosDelDia}" Spacing="5">
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate>
-                                    <HorizontalStackLayout BindableLayout.ItemsSource="{Binding ViajesDeLaSemana}" Spacing="5">
-                                        <BindableLayout.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border WidthRequest="180" HeightRequest="160" StrokeShape="RoundRectangle 8" StrokeThickness="0">
-                                                    <Grid>
-                                                        <Border IsVisible="{Binding TieneViaje}" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Stroke="{StaticResource Primary}" StrokeThickness="1" Padding="5">
-                                                            <ScrollView VerticalScrollBarVisibility="Never">
-                                                                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Opciones}" Spacing="5">
-                                                                    <BindableLayout.ItemTemplate>
-                                                                        <DataTemplate>
-                                                                            <Border BackgroundColor="{Binding ColorFondo}" StrokeThickness="0" StrokeShape="RoundRectangle 4" Padding="5">
-                                                                                <Border.GestureRecognizers>
-                                                                                    <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.AbrirPanelReservaCommand}" CommandParameter="{Binding .}"/>
-                                                                                </Border.GestureRecognizers>
-                                                                                <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="5">
-                                                                                    <!-- Radio seleccionable — solo mientras NO esté reservado todavía -->
-                                                                                    <Border Grid.Column="0" WidthRequest="14" HeightRequest="14" StrokeShape="RoundRectangle 7" Stroke="White" StrokeThickness="1" BackgroundColor="Transparent" VerticalOptions="Center" IsVisible="{Binding YaReservado, Converter={StaticResource InvertedBoolConverter}}">
-                                                                                        <Border IsVisible="{Binding IsSelected}" WidthRequest="6" HeightRequest="6" StrokeShape="RoundRectangle 3" BackgroundColor="White" HorizontalOptions="Center" VerticalOptions="Center" StrokeThickness="0"/>
-                                                                                    </Border>
-                                                                                    <!--  Ya reservado: check fijo en vez del radio — ya no se puede volver a
-                                                                                         "seleccionar para reservar" (el VM también lo bloquea del lado de datos,
-                                                                                         esto es solo la señal visual para que el usuario nuevo lo entienda solo). -->
-                                                                                    <Label Grid.Column="0" Text="✅" FontSize="12" VerticalOptions="Center" IsVisible="{Binding YaReservado}"/>
-
-                                                                                    <Label Grid.Column="1" Text="{Binding ChoferInfo, StringFormat='👤 {0}'}" FontSize="11" FontAttributes="Bold" TextColor="White" LineBreakMode="TailTruncation" VerticalOptions="Center"/>
-
-                                                                                    <!--  Botón de cancelar — solo aparece si ya está reservado. Reusa el
-                                                                                         mismo comando que "Mi Horario" (CancelarMiReservaCommand), así el
-                                                                                         pasajero puede arrepentirse sin salir de esta pantalla. -->
-                                                                                    <ImageButton Grid.Column="2" WidthRequest="18" HeightRequest="18" BackgroundColor="Transparent" VerticalOptions="Center"
-                                                                                                 IsVisible="{Binding YaReservado}"
-                                                                                                 Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.CancelarMiReservaCommand}"
-                                                                                                 CommandParameter="{Binding IdReservaExistente}">
-                                                                                        <ImageButton.Source>
-                                                                                            <FontImageSource FontFamily="OpenSansRegular" Glyph="✕" Color="White"/>
-                                                                                        </ImageButton.Source>
-                                                                                    </ImageButton>
-                                                                                </Grid>
-                                                                            </Border>
-                                                                        </DataTemplate>
-                                                                    </BindableLayout.ItemTemplate>
+                                    <Border StrokeShape="RoundRectangle 12" StrokeThickness="2" Padding="10,8"
+                                            BackgroundColor="{Binding ColorFondo}" Stroke="{Binding ColorBorde}" Opacity="{Binding Opacidad}">
+                                        <VerticalStackLayout Spacing="6">
+                                            <Grid ColumnDefinitions="*, Auto">
+                                                <Grid.GestureRecognizers>
+                                                    <TapGestureRecognizer Command="{Binding TocarCommand}" CommandParameter="{Binding .}"/>
+                                                </Grid.GestureRecognizers>
+                                                <VerticalStackLayout Grid.Column="0" Spacing="1">
+                                                    <Label Text="{Binding Hora}" FontSize="17" FontAttributes="Bold" TextColor="{Binding ColorTexto}"/>
+                                                    <Label Text="{Binding Detalle}" FontSize="11" TextColor="{Binding ColorTexto}" Opacity="0.75" LineBreakMode="WordWrap"/>
+                                                    <Label Text="{Binding TextoChofer}" FontSize="11" FontAttributes="Bold" TextColor="{Binding ColorTexto}" LineBreakMode="WordWrap"/>
+                                                </VerticalStackLayout>
+                                                <Label Grid.Column="1" Text="{Binding Marca}" FontSize="16" FontAttributes="Bold" VerticalOptions="Center" TextColor="{Binding ColorTexto}"/>
+                                            </Grid>
+                                            <!-- Elegir chofer cuando salen varios micros -->
+                                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Unidades}" Spacing="4" IsVisible="{Binding MostrarUnidades}">
+                                                <BindableLayout.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border StrokeShape="RoundRectangle 8" StrokeThickness="1" Stroke="#99000000" Padding="6" BackgroundColor="{Binding ColorFondo}">
+                                                            <Border.GestureRecognizers>
+                                                                <TapGestureRecognizer Command="{Binding ElegirCommand}" CommandParameter="{Binding .}"/>
+                                                            </Border.GestureRecognizers>
+                                                            <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="6">
+                                                                <Border Grid.Column="0" WidthRequest="28" HeightRequest="28" StrokeShape="RoundRectangle 14" StrokeThickness="0" BackgroundColor="#33000000" VerticalOptions="Center">
+                                                                    <Grid>
+                                                                        <Label Text="👤" FontSize="13" HorizontalOptions="Center" VerticalOptions="Center" IsVisible="{Binding TieneFoto, Converter={StaticResource InvertedBoolConverter}}"/>
+                                                                        <Image Source="{Binding Foto}" Aspect="AspectFill" IsVisible="{Binding TieneFoto}"/>
+                                                                    </Grid>
+                                                                </Border>
+                                                                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="0">
+                                                                    <Label Text="{Binding Nombre}" FontSize="12" FontAttributes="Bold" TextColor="Black" LineBreakMode="TailTruncation"/>
+                                                                    <Label Text="{Binding Detalle}" FontSize="10" TextColor="#333333" LineBreakMode="TailTruncation"/>
                                                                 </VerticalStackLayout>
-                                                            </ScrollView>
+                                                                <Label Grid.Column="2" Text="{Binding Marca}" FontSize="16" TextColor="Black" VerticalOptions="Center"/>
+                                                            </Grid>
                                                         </Border>
-                                                        <Border IsVisible="{Binding TieneViaje, Converter={StaticResource InvertedBoolConverter}}" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" StrokeThickness="0" />
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </BindableLayout.ItemTemplate>
-                                    </HorizontalStackLayout>
+                                                    </DataTemplate>
+                                                </BindableLayout.ItemTemplate>
+                                            </VerticalStackLayout>
+                                        </VerticalStackLayout>
+                                    </Border>
                                 </DataTemplate>
                             </BindableLayout.ItemTemplate>
                         </VerticalStackLayout>
                     </VerticalStackLayout>
-                </ScrollView>
-            </Grid>
+
+                    <!-- SALIR DE LA U (regreso) -->
+                    <VerticalStackLayout Grid.Column="1" Spacing="8">
+                        <Border BackgroundColor="#1565C0" StrokeThickness="0" StrokeShape="RoundRectangle 10" Padding="8,8">
+                            <Label Text="{helpers:Translate FleetSched_LeaveHeader}" FontAttributes="Bold" FontSize="14" TextColor="White" HorizontalOptions="Center"/>
+                        </Border>
+                        <Label Text="{helpers:Translate FleetSched_NoDepartures}" FontSize="12" TextColor="Gray" HorizontalOptions="Center" IsVisible="{Binding DiaActivo.SinSalidas}"/>
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding DiaActivo.Salidas}" Spacing="8">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <Border StrokeShape="RoundRectangle 12" StrokeThickness="2" Padding="10,8"
+                                            BackgroundColor="{Binding ColorFondo}" Stroke="{Binding ColorBorde}" Opacity="{Binding Opacidad}">
+                                        <VerticalStackLayout Spacing="6">
+                                            <Grid ColumnDefinitions="*, Auto">
+                                                <Grid.GestureRecognizers>
+                                                    <TapGestureRecognizer Command="{Binding TocarCommand}" CommandParameter="{Binding .}"/>
+                                                </Grid.GestureRecognizers>
+                                                <VerticalStackLayout Grid.Column="0" Spacing="1">
+                                                    <Label Text="{Binding Hora}" FontSize="17" FontAttributes="Bold" TextColor="{Binding ColorTexto}"/>
+                                                    <Label Text="{Binding Detalle}" FontSize="11" TextColor="{Binding ColorTexto}" Opacity="0.75" LineBreakMode="WordWrap"/>
+                                                    <Label Text="{Binding TextoChofer}" FontSize="11" FontAttributes="Bold" TextColor="{Binding ColorTexto}" LineBreakMode="WordWrap"/>
+                                                </VerticalStackLayout>
+                                                <Label Grid.Column="1" Text="{Binding Marca}" FontSize="16" FontAttributes="Bold" VerticalOptions="Center" TextColor="{Binding ColorTexto}"/>
+                                            </Grid>
+                                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Unidades}" Spacing="4" IsVisible="{Binding MostrarUnidades}">
+                                                <BindableLayout.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border StrokeShape="RoundRectangle 8" StrokeThickness="1" Stroke="#99000000" Padding="6" BackgroundColor="{Binding ColorFondo}">
+                                                            <Border.GestureRecognizers>
+                                                                <TapGestureRecognizer Command="{Binding ElegirCommand}" CommandParameter="{Binding .}"/>
+                                                            </Border.GestureRecognizers>
+                                                            <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="6">
+                                                                <Border Grid.Column="0" WidthRequest="28" HeightRequest="28" StrokeShape="RoundRectangle 14" StrokeThickness="0" BackgroundColor="#33000000" VerticalOptions="Center">
+                                                                    <Grid>
+                                                                        <Label Text="👤" FontSize="13" HorizontalOptions="Center" VerticalOptions="Center" IsVisible="{Binding TieneFoto, Converter={StaticResource InvertedBoolConverter}}"/>
+                                                                        <Image Source="{Binding Foto}" Aspect="AspectFill" IsVisible="{Binding TieneFoto}"/>
+                                                                    </Grid>
+                                                                </Border>
+                                                                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="0">
+                                                                    <Label Text="{Binding Nombre}" FontSize="12" FontAttributes="Bold" TextColor="Black" LineBreakMode="TailTruncation"/>
+                                                                    <Label Text="{Binding Detalle}" FontSize="10" TextColor="#333333" LineBreakMode="TailTruncation"/>
+                                                                </VerticalStackLayout>
+                                                                <Label Grid.Column="2" Text="{Binding Marca}" FontSize="16" TextColor="Black" VerticalOptions="Center"/>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </BindableLayout.ItemTemplate>
+                                            </VerticalStackLayout>
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Grid>
+
+                <Label Text="{helpers:Translate FleetSched_DayHint}"
+                       FontSize="11" TextColor="Gray" HorizontalTextAlignment="Center" Margin="0,10,0,0"/>
+            </VerticalStackLayout>
         </ScrollView>
 
-        <Border Grid.Row="2" IsVisible="{Binding HaySeleccionActiva}" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Padding="15" StrokeThickness="0">
-            <Border.Shadow>
-                <Shadow Brush="Black" Offset="0,-2" Opacity="0.15" Radius="8"/>
-            </Border.Shadow>
-            <Button Text="{helpers:Translate Global_Next}" Command="{Binding SiguienteCommand}" BackgroundColor="{StaticResource Primary}" TextColor="Black" FontAttributes="Bold" CornerRadius="10" HeightRequest="50"/>
+        <!-- ═════════ 🆕 VISTA "📅 HORARIO" (como el de la universidad) ═════════ -->
+        <Grid Grid.Row="1" Grid.RowSpan="2" RowDefinitions="Auto, *" IsVisible="{Binding VistaHorario}">
+
+            <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto" Padding="6,6" BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}">
+                <Button Grid.Column="0" Text="◀" Command="{Binding SemanaHorarioAnteriorCommand}" IsEnabled="{Binding PuedeSemanaAnterior}"
+                        BackgroundColor="Transparent" TextColor="{StaticResource Primary}" FontSize="20" WidthRequest="48"/>
+                <VerticalStackLayout Grid.Column="1" HorizontalOptions="Center" VerticalOptions="Center" Spacing="1">
+                    <Label Text="{Binding TextoSemanaHorario}" FontAttributes="Bold" FontSize="14" HorizontalOptions="Center" TextColor="{AppThemeBinding Light=Black, Dark=White}"/>
+                    <Label Text="{helpers:Translate FleetSched_Legend}" FontSize="11" TextColor="Gray" HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+                <Button Grid.Column="2" Text="▶" Command="{Binding SemanaHorarioSiguienteCommand}" IsEnabled="{Binding PuedeSemanaSiguiente}"
+                        BackgroundColor="Transparent" TextColor="{StaticResource Primary}" FontSize="20" WidthRequest="48"/>
+            </Grid>
+
+            <ScrollView Grid.Row="1" Orientation="Both">
+                <VerticalStackLayout Padding="8,6,8,16" Spacing="0">
+
+                    <!-- Encabezado: días -->
+                    <HorizontalStackLayout Spacing="4" Margin="0,0,0,4">
+                        <Border WidthRequest="62" HeightRequest="42" BackgroundColor="#7B1E1E" StrokeThickness="0" StrokeShape="RoundRectangle 6">
+                            <Label Text="{helpers:Translate FleetSched_TimeHeader}" TextColor="White" FontAttributes="Bold" FontSize="12" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        </Border>
+                        <HorizontalStackLayout BindableLayout.ItemsSource="{Binding ColumnasHorario}" Spacing="4">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <Border WidthRequest="64" HeightRequest="42" BackgroundColor="#7B1E1E" StrokeThickness="0" StrokeShape="RoundRectangle 6" Opacity="{Binding Opacidad}">
+                                        <VerticalStackLayout VerticalOptions="Center" Spacing="0">
+                                            <Label Text="{Binding Abrev}" TextColor="White" FontAttributes="Bold" FontSize="12" HorizontalOptions="Center"/>
+                                            <Label Text="{Binding Numero}" TextColor="White" FontSize="12" HorizontalOptions="Center"/>
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </HorizontalStackLayout>
+                    </HorizontalStackLayout>
+
+                    <Label Text="{helpers:Translate FleetSched_NoTripsWeek}" FontSize="14" TextColor="Gray" Margin="10,30" IsVisible="{Binding HorarioVacio}"/>
+
+                    <!-- Filas: una por hora -->
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding FilasHorario}">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate>
+                                <HorizontalStackLayout Spacing="4" Padding="0,3" BackgroundColor="{Binding ColorFondo}">
+                                    <Label Text="{Binding Hora}" WidthRequest="62" FontSize="12" FontAttributes="Bold" VerticalOptions="Center" HorizontalTextAlignment="Center"
+                                           TextColor="{AppThemeBinding Light=Black, Dark=White}"/>
+                                    <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Celdas}" Spacing="4">
+                                        <BindableLayout.ItemTemplate>
+                                            <DataTemplate>
+                                                <VerticalStackLayout WidthRequest="64" MinimumHeightRequest="38" Spacing="3" VerticalOptions="Center" BindableLayout.ItemsSource="{Binding Chips}">
+                                                    <BindableLayout.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border HeightRequest="36" StrokeShape="RoundRectangle 8" StrokeThickness="2"
+                                                                    BackgroundColor="{Binding ColorFondo}" Stroke="{Binding ColorBorde}" Opacity="{Binding Opacidad}">
+                                                                <Border.GestureRecognizers>
+                                                                    <TapGestureRecognizer Command="{Binding TocarEnHorarioCommand}" CommandParameter="{Binding .}"/>
+                                                                </Border.GestureRecognizers>
+                                                                <Label Text="{Binding TextoCompacto}" FontSize="13" FontAttributes="Bold" TextColor="{Binding ColorTexto}"
+                                                                       HorizontalOptions="Center" VerticalOptions="Center"/>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </BindableLayout.ItemTemplate>
+                                                </VerticalStackLayout>
+                                            </DataTemplate>
+                                        </BindableLayout.ItemTemplate>
+                                    </HorizontalStackLayout>
+                                </HorizontalStackLayout>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+
+                    <Label Text="{helpers:Translate FleetSched_GridHint}"
+                           FontSize="11" TextColor="Gray" Margin="0,12,0,0" WidthRequest="330" HorizontalOptions="Start"/>
+                </VerticalStackLayout>
+            </ScrollView>
+        </Grid>
+
+        <!-- CONTINUAR (solo pasajeros) -->
+        <Border Grid.Row="3" BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}" Padding="15,10,15,20" StrokeThickness="0" IsVisible="{Binding IsPasajero}">
+            <Button Text="{Binding TextoBotonContinuar}" Command="{Binding IrAConfirmarReservaCommand}" IsEnabled="{Binding HaySeleccion}"
+                    BackgroundColor="{StaticResource Primary}" TextColor="Black" FontAttributes="Bold" HeightRequest="52" CornerRadius="10"/>
         </Border>
 
-        <ActivityIndicator Grid.RowSpan="3" IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}" Color="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" WidthRequest="50" HeightRequest="50"/>
+        <ActivityIndicator Grid.RowSpan="4" IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}" Color="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" WidthRequest="50" HeightRequest="50"/>
     </Grid>
 </ContentPage>

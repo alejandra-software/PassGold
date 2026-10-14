@@ -26,8 +26,7 @@ namespace PassGold.Services
     {
         // Mismos valores que usa SupabaseService.cs — la Edge Function vive en el
         // mismo proyecto de Supabase.
-        private const string SupabaseUrl = "";
-        private const string SupabaseAnonKey = "api de cloudinary";
+       
         // 🔧 Ajustado al nombre real que Supabase le asignó a la función al crearla
         // ("bright-responder" — el nombre en sí no importa para nada, la lógica es
         // la misma; si en algún momento se renombra en Supabase, actualizar acá).
@@ -52,7 +51,7 @@ namespace PassGold.Services
         {
             if (string.IsNullOrWhiteSpace(rutaLocalArchivo) || !File.Exists(rutaLocalArchivo))
             {
-                string err = "Ruta de archivo inválida o no existe.";
+                string err = PassGold.Helpers.AppResources.Upload_InvalidPath;
                 Debug.WriteLine($"❌ Cloudinary: {err}");
                 return (null, err);
             }
@@ -122,7 +121,7 @@ namespace PassGold.Services
                 if (string.IsNullOrEmpty(url))
                 {
                     Debug.WriteLine($"❌ Edge Function respondió sin URL: {responseBody}");
-                    return (null, errorMsg ?? "Respuesta sin URL de la función.");
+                    return (null, errorMsg ?? PassGold.Helpers.AppResources.Upload_NoUrl);
                 }
 
                 Debug.WriteLine($"✅ Imagen subida -> {url}");
@@ -130,7 +129,7 @@ namespace PassGold.Services
             }
             catch (TaskCanceledException)
             {
-                string err = "Tiempo de espera agotado (revisa conexión a internet).";
+                string err = PassGold.Helpers.AppResources.Upload_Timeout;
                 Debug.WriteLine($"❌ Cloudinary: {err}");
                 return (null, err);
             }
@@ -149,7 +148,7 @@ namespace PassGold.Services
         {
             using var bitmapOriginal = SKBitmap.Decode(original);
             if (bitmapOriginal == null)
-                throw new InvalidOperationException("No se pudo leer la imagen (formato no soportado o archivo dañado).");
+                throw new InvalidOperationException(PassGold.Helpers.AppResources.Upload_UnreadableImage);
 
             int ancho = bitmapOriginal.Width;
             int alto = bitmapOriginal.Height;

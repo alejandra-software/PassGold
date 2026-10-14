@@ -72,7 +72,11 @@ public partial class EditVehicleViewModel : ObservableObject
                 // real de Cloudinary/red para poder depurar más rápido.
                 await Shell.Current.DisplayAlert(
                     AppResources.Global_Error,
-                    $"No se pudo subir la foto.\n\nDIAGNÓSTICO: {error}",
+#if DEBUG
+                    AppResources.Vehicle_PhotoUploadError + AppResources.F(AppResources.Global_Diagnostic, error),
+#else
+                    AppResources.Vehicle_PhotoUploadError,
+#endif
                     AppResources.Global_Ok);
             }
         }

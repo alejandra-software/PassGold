@@ -67,6 +67,29 @@ public class LocalDatabaseService
         catch { return null; }
     }
 
+    // Al cambiar de rol: se borra la caché (pantallas guardadas con el rol anterior)
+    public async Task BorrarCacheAsync()
+    {
+        try
+        {
+            await IniciarConexionAsync();
+            await _conexion!.DeleteAllAsync<CacheLocal>();
+        }
+        catch { }
+    }
+
+    // Al eliminar la cuenta: se borra la sesión y TODA la caché guardada en el celular
+    public async Task BorrarTodoAsync()
+    {
+        try
+        {
+            await IniciarConexionAsync();
+            await _conexion!.DeleteAllAsync<UsuarioLocal>();
+            await _conexion!.DeleteAllAsync<CacheLocal>();
+        }
+        catch { }
+    }
+
     public async Task<bool> CerrarSesionLocalAsync()
     {
         try

@@ -5,47 +5,122 @@ using Microsoft.Maui.Devices.Sensors;
 using System;
 using System.Linq;
 using Microsoft.Maui.Controls;
+using Microsoft.Maui.ApplicationModel;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace PassGold.Views;
 
 public partial class ScheduleTripPage : ContentPage
 {
+    private bool _eventosAsignados = false;
+    private bool _permisosVerificados = false;
+
     public ScheduleTripPage()
     {
         InitializeComponent();
 
-        // Cuando el mapa nativo cambia su región visible (el usuario arrastra el mapa
-        // a mano, además de cuando buscamos), guardamos el centro real en el ViewModel
-        // para que ConfirmarPuntoMapa() ya no use el placeholder 0,0.
-        MapaDestinosOficial.PropertyChanged += (s, e) =>
+        if (App.Services != null)
         {
-            if (e.PropertyName == nameof(Microsoft.Maui.Controls.Maps.Map.VisibleRegion) &&
-                MapaDestinosOficial.VisibleRegion != null &&
-                BindingContext is ScheduleTripViewModel vm)
+            BindingContext = App.Services.GetService<ScheduleTripViewModel>();
+        }
+    }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+
+        if (!_eventosAsignados)
+        {
+            MapaDestinosOficial.PropertyChanged += MapaDestinosOficial_PropertyChanged;
+
+            if (BindingContext is ScheduleTripViewModel viewModel)
+            {
+                viewModel.PropertyChanged += ViewModel_PropertyChanged;
+            }
+
+            _eventosAsignados = true;
+        }
+
+        if (!_permisosVerificados)
+        {
+            await VerificarPermisoUbicacionAsync();
+            _permisosVerificados = true;
+        }
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+
+        if (_eventosAsignados)
+        {
+            MapaDestinosOficial.PropertyChanged -= MapaDestinosOficial_PropertyChanged;
+
+            if (BindingContext is ScheduleTripViewModel viewModel)
+            {
+                viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+            }
+
+            _eventosAsignados = false;
+        }
+    }
+
+    private async Task VerificarPermisoUbicacionAsync()
+    {
+        try
+        {
+            var status = await Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>();
+
+            if (status != PermissionStatus.Granted)
+            {
+                status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+            }
+
+            if (status == PermissionStatus.Granted)
+            {
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    MapaDestinosOficial.IsShowingUser = true;
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error solicitando permisos: {ex.Message}");
+        }
+    }
+
+    private void MapaDestinosOficial_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(Microsoft.Maui.Controls.Maps.Map.VisibleRegion) &&
+            MapaDestinosOficial.VisibleRegion != null &&
+            BindingContext is ScheduleTripViewModel vm)
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
             {
                 var centro = MapaDestinosOficial.VisibleRegion.Center;
                 vm.LatitudTemporal = centro.Latitude;
                 vm.LongitudTemporal = centro.Longitude;
-            }
-        };
-
-        // Cuando se abre el modal del mapa, lo centramos en la última posición conocida
-        // (o el default de Santa Ana si es la primera vez).
-        if (BindingContext is ScheduleTripViewModel viewModel)
-        {
-            viewModel.PropertyChanged += (s, e) =>
-            {
-                if (e.PropertyName == nameof(ScheduleTripViewModel.IsMapModalVisible) && viewModel.IsMapModalVisible)
-                {
-                    var ubicacion = new Location(viewModel.LatitudTemporal, viewModel.LongitudTemporal);
-                    MapaDestinosOficial.MoveToRegion(MapSpan.FromCenterAndRadius(ubicacion, Distance.FromKilometers(1)));
-                }
-            };
+            });
         }
     }
 
-    //  Buscador gratuito: usa el motor de geocodificación del propio celular,
-    // sin API key ni costo — el mismo patrón que ya usan en PassengerDashboardPage.
+    private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (sender is ScheduleTripViewModel viewModel)
+        {
+            if (e.PropertyName == nameof(ScheduleTripViewModel.IsMapModalVisible) && viewModel.IsMapModalVisible)
+            {
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    var ubicacion = new Location(viewModel.LatitudTemporal, viewModel.LongitudTemporal);
+                    MapaDestinosOficial.MoveToRegion(MapSpan.FromCenterAndRadius(ubicacion, Distance.FromKilometers(1)));
+                });
+            }
+        }
+    }
+
     private async void BuscadorMetas_SearchButtonPressed(object sender, EventArgs e)
     {
         var query = BuscadorMetas.Text;
@@ -53,30 +128,38 @@ public partial class ScheduleTripPage : ContentPage
 
         try
         {
-            string busquedaExacta = $"{query}, El Salvador";
-            var ubicaciones = await Geocoding.Default.GetLocationsAsync(busquedaExacta);
-            var ubicacionEncontrada = ubicaciones?.FirstOrDefault();
+            // Buscador compartido (Apple Maps en iPhone + filtros para El Salvador)
+            var ubicacionEncontrada = await PassGold.Helpers.BuscadorLugares.BuscarAsync(query, MapaDestinosOficial.VisibleRegion?.Center);
 
             if (ubicacionEncontrada != null)
             {
-                MapaDestinosOficial.MoveToRegion(MapSpan.FromCenterAndRadius(ubicacionEncontrada, Distance.FromKilometers(0.5)));
-
-                if (BindingContext is ScheduleTripViewModel vm)
+                MainThread.BeginInvokeOnMainThread(() =>
                 {
-                    vm.LatitudTemporal = ubicacionEncontrada.Latitude;
-                    vm.LongitudTemporal = ubicacionEncontrada.Longitude;
-                }
+                    MapaDestinosOficial.MoveToRegion(MapSpan.FromCenterAndRadius(ubicacionEncontrada, Distance.FromKilometers(0.5)));
 
-                BuscadorMetas.Unfocus();
+                    if (BindingContext is ScheduleTripViewModel vm)
+                    {
+                        vm.LatitudTemporal = ubicacionEncontrada.Latitude;
+                        vm.LongitudTemporal = ubicacionEncontrada.Longitude;
+                    }
+
+                    BuscadorMetas.Unfocus();
+                });
             }
             else
             {
-                await DisplayAlert("No encontrado", "No pudimos localizar ese lugar exacto. Intenta con un nombre más general, o simplemente arrastra el mapa hasta el lugar correcto.", "OK");
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    await DisplayAlert(PassGold.Helpers.AppResources.Global_NotFound, PassGold.Helpers.AppResources.Schedule_PlaceNotFound, PassGold.Helpers.AppResources.Global_Ok);
+                });
             }
         }
         catch (Exception)
         {
-            await DisplayAlert("Error", "Necesitas internet para usar el buscador de direcciones.", "OK");
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                await DisplayAlert(PassGold.Helpers.AppResources.Global_Error, PassGold.Helpers.AppResources.Schedule_NeedInternetSearch, PassGold.Helpers.AppResources.Global_Ok);
+            });
         }
     }
 }

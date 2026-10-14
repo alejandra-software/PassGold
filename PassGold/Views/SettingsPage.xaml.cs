@@ -1,4 +1,7 @@
 using PassGold.ViewModels;
+using Microsoft.Maui.Storage;
+using System;
+using Microsoft.Maui.Controls;
 
 namespace PassGold.Views;
 
@@ -12,6 +15,9 @@ public partial class SettingsPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+
+        // 🔧 Antes acá se leía/guardaba el GPS a mano (GpsSwitch). Ahora el interruptor
+        // está conectado por binding al ViewModel, que también pide el permiso.
         if (BindingContext is SettingsViewModel vm)
         {
             vm.LoadProfileCommand.Execute(null);

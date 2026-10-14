@@ -20,9 +20,17 @@
 
     <!-- Encabezado del Menú -->
     <Shell.FlyoutHeader>
-        <VerticalStackLayout Padding="20,40,20,20" BackgroundColor="{StaticResource Primary}">
-            <Label Text=" YsO" FontSize="40"/>
-            <Label Text="{helpers:Translate AppTitle}" FontSize="20" FontAttributes="Bold" TextColor="#000000"/>
+        <!-- Fondo negro puro para camuflar el recuadro de tu foto -->
+        <VerticalStackLayout Padding="20,40,20,20" BackgroundColor="#000000">
+
+            <Image Source="logointerno.png" 
+                   WidthRequest="100" 
+                   HeightRequest="100" 
+                   HorizontalOptions="Start" 
+                   Margin="0,0,0,10"/>
+
+            <!-- El texto ahora usa tu color dorado Primary definido en Colors.xaml -->
+            <Label Text="{helpers:Translate AppTitle}" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
         </VerticalStackLayout>
     </Shell.FlyoutHeader>
 
@@ -32,12 +40,6 @@
 
                 <Button Text="{helpers:Translate MenuHome}" Command="{Binding GoToHomeCommand}" Style="{StaticResource MenuBtnStyle}"/>
 
-                <!-- DIRECTORIO Y NORMAS (Pasajeros) -->
-                <!--  FIX: antes esto era solo para pasajeros (IsVisible="{Binding
-                     IsPasajero}"). Ahora cualquier rol puede entrar a ver el
-                     directorio de flotas — FleetProfilePage se encarga de ocultar
-                     el botón de "Ver Horarios" (reservar) cuando quien mira es un
-                     chofer, así que acá no hace falta restringir nada. -->
                 <Button Text="{helpers:Translate PassengerDash_DirectoryTitle}" 
                         Clicked="MenuNavegar_Clicked" 
                         CommandParameter="fleet-directory" 
@@ -48,12 +50,15 @@
                         CommandParameter="passenger-rules" 
                         Style="{StaticResource MenuBtnStyle}" 
                         IsVisible="{Binding IsPasajero}"/>
+                <Button Text="{helpers:Translate Track_Btn}" 
+                        Clicked="MenuNavegar_Clicked" 
+                        CommandParameter="mapa-pasajero" 
+                        Style="{StaticResource MenuBtnStyle}" 
+                        IsVisible="{Binding IsPasajero}"/>
 
-                <!-- PROGRAMAR VIAJES (Jefes) -->
                 <Button Text="{helpers:Translate MenuSchedule}" Command="{Binding GoToScheduleTripCommand}" Style="{StaticResource MenuBtnStyle}"
                         IsVisible="{Binding CanManageFleet}"/>
 
-                <!-- ADMINISTRAR FLOTA (Choferes) -->
                 <Button Text="{helpers:Translate MenuAdminFleet}" Command="{Binding GoToAdminFleetCommand}" Style="{StaticResource MenuBtnStyle}"
                         IsVisible="{Binding IsPasajero, Converter={StaticResource InvertedBoolConverter}}"/>
 
@@ -66,10 +71,18 @@
         </ScrollView>
     </Shell.FlyoutContent>
 
+    <!-- Páginas de autenticación independientes -->
     <ShellContent Route="login" ContentTemplate="{DataTemplate views:LoginPage}" FlyoutItemIsVisible="False" />
     <ShellContent Route="register-step1" ContentTemplate="{DataTemplate views:RegisterStep1Page}" FlyoutItemIsVisible="False" />
     <ShellContent Route="register-step2" ContentTemplate="{DataTemplate views:RegisterStep2Page}" FlyoutItemIsVisible="False" />
-    <ShellContent Route="driver-dashboard" ContentTemplate="{DataTemplate views:DriverDashboardPage}" FlyoutItemIsVisible="False" />
-    <ShellContent Route="passenger-dashboard" ContentTemplate="{DataTemplate views:PassengerDashboardPage}" FlyoutItemIsVisible="False" />
+
+    <!-- CONTENEDORES PRINCIPALES DE LOS DASHBOARDS ENVOLVIÉNDOLOS EN FLUTOYITEMS VÁLIDOS -->
+    <FlyoutItem Route="driver-dashboard" FlyoutItemIsVisible="False">
+        <ShellContent ContentTemplate="{DataTemplate views:DriverDashboardPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Route="passenger-dashboard" FlyoutItemIsVisible="False">
+        <ShellContent ContentTemplate="{DataTemplate views:PassengerDashboardPage}" />
+    </FlyoutItem>
 
 </Shell>

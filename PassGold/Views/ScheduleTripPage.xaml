@@ -8,9 +8,7 @@
              Title="{helpers:Translate Schedule_Title}"
              BackgroundColor="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}">
 
-    <ContentPage.BindingContext>
-        <viewmodels:ScheduleTripViewModel />
-    </ContentPage.BindingContext>
+    <!-- Ya no declaramos el BindingContext aquí porque lo inyectamos desde el constructor en el archivo .cs -->
 
     <Grid>
         <ScrollView>
@@ -55,7 +53,6 @@
                                 </BindableLayout.ItemTemplate>
                             </VerticalStackLayout>
 
-                            <!--  FIX: Botón de mapa adaptado a modo oscuro para que sea visible -->
                             <Button Text="{helpers:Translate Schedule_AddWaypointBtn}" Command="{Binding AbrirMapaMetasCommand}" BackgroundColor="Transparent" TextColor="{AppThemeBinding Light=#1565C0, Dark=#90CAF9}" FontAttributes="Bold" />
                         </VerticalStackLayout>
                     </Border>
@@ -161,10 +158,12 @@
                                     <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
                                         <Border StrokeShape="RoundRectangle 24" WidthRequest="48" HeightRequest="48" StrokeThickness="0" HorizontalOptions="Center"
                                                 BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}">
+
                                             <Grid>
                                                 <Label Text="👤" FontSize="20" HorizontalOptions="Center" VerticalOptions="Center" IsVisible="{Binding FotoPerfil, Converter={StaticResource StringToBoolInvertedConverter}}"/>
                                                 <Image Source="{Binding FotoPerfil}" Aspect="AspectFill" IsVisible="{Binding FotoPerfil, Converter={StaticResource StringToBoolConverter}}"/>
                                             </Grid>
+
                                         </Border>
                                         <Label Text="{Binding Nombre}" FontSize="10" HorizontalTextAlignment="Center" LineBreakMode="TailTruncation" MaxLines="1" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
                                     </VerticalStackLayout>
@@ -199,10 +198,12 @@
                                     <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
                                         <Border StrokeShape="RoundRectangle 8" WidthRequest="48" HeightRequest="48" StrokeThickness="0" HorizontalOptions="Center"
                                                 BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}">
+
                                             <Grid>
                                                 <Label Text="🚐" FontSize="20" HorizontalOptions="Center" VerticalOptions="Center" IsVisible="{Binding FotoUrl, Converter={StaticResource StringToBoolInvertedConverter}}"/>
                                                 <Image Source="{Binding FotoUrl}" Aspect="AspectFill" IsVisible="{Binding FotoUrl, Converter={StaticResource StringToBoolConverter}}"/>
                                             </Grid>
+
                                         </Border>
                                         <Label Text="{Binding Placa}" FontSize="10" HorizontalTextAlignment="Center" LineBreakMode="TailTruncation" MaxLines="1" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
                                     </VerticalStackLayout>
@@ -220,16 +221,20 @@
                             <Border Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeShape="RoundRectangle 8" Padding="10">
                                 <Grid ColumnDefinitions="36, 36, *, Auto" ColumnSpacing="8">
                                     <Border Grid.Column="0" StrokeShape="RoundRectangle 18" WidthRequest="36" HeightRequest="36" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}">
+
                                         <Grid>
                                             <Label Text="👤" FontSize="16" HorizontalOptions="Center" VerticalOptions="Center" IsVisible="{Binding Chofer.FotoPerfil, Converter={StaticResource StringToBoolInvertedConverter}}"/>
                                             <Image Source="{Binding Chofer.FotoPerfil}" Aspect="AspectFill" IsVisible="{Binding Chofer.FotoPerfil, Converter={StaticResource StringToBoolConverter}}"/>
                                         </Grid>
+
                                     </Border>
                                     <Border Grid.Column="1" StrokeShape="RoundRectangle 6" WidthRequest="36" HeightRequest="36" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}">
+
                                         <Grid>
                                             <Label Text="🚐" FontSize="16" HorizontalOptions="Center" VerticalOptions="Center" IsVisible="{Binding Vehiculo.FotoUrl, Converter={StaticResource StringToBoolInvertedConverter}}"/>
                                             <Image Source="{Binding Vehiculo.FotoUrl}" Aspect="AspectFill" IsVisible="{Binding Vehiculo.FotoUrl, Converter={StaticResource StringToBoolConverter}}"/>
                                         </Grid>
+
                                     </Border>
                                     <Label Grid.Column="2" Text="{Binding Detalles}" VerticalOptions="Center" FontAttributes="Bold"/>
                                     <ImageButton Grid.Column="3" Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:ScheduleTripViewModel}}, Path=RemoveAsignacionCommand}" CommandParameter="{Binding .}" WidthRequest="25" HeightRequest="25" BackgroundColor="Transparent">
@@ -261,7 +266,11 @@
                 <Border Grid.Row="0" Margin="15,10" Stroke="{StaticResource Primary}" StrokeShape="RoundRectangle 25" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}">
                     <SearchBar x:Name="BuscadorMetas" Placeholder="{helpers:Translate Schedule_MapSearchPlaceholder}" SearchButtonPressed="BuscadorMetas_SearchButtonPressed" BackgroundColor="Transparent" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
                 </Border>
-                <maps:Map x:Name="MapaDestinosOficial" Grid.Row="1" MapType="{Binding CurrentMapType}" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" IsShowingUser="True" />
+                <!-- 🔧 FIX: "IsShowingUser=True" acá pedía el GPS apenas se dibuja el
+                     mapa, antes de pedir permiso — causa típica de crash en iOS. El
+                     code-behind ya pide el permiso en OnAppearing (VerificarPermisoUbicacionAsync)
+                     y recién después activa esto desde código. -->
+                <maps:Map x:Name="MapaDestinosOficial" Grid.Row="1" MapType="{Binding CurrentMapType}" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" />
                 <Label Grid.Row="1" Text="🎯" FontSize="40" HorizontalOptions="Center" VerticalOptions="Center" InputTransparent="True"/>
                 <Button Grid.Row="1" Text="🛰️" Command="{Binding ToggleMapTypeCommand}" HorizontalOptions="End" VerticalOptions="Start" Margin="0,10,10,0" WidthRequest="44" HeightRequest="44" CornerRadius="22" Padding="0" BackgroundColor="#CC000000" FontSize="20"/>
             </Grid>
@@ -271,7 +280,6 @@
                 <Border Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeShape="RoundRectangle 8" Padding="10,0">
                     <Entry Text="{Binding NuevoAliasPunto}" Placeholder="{helpers:Translate Schedule_MapAliasPlaceholder}" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" />
                 </Border>
-                <!-- FIX: Botón con contraste seguro en negro sobre primary -->
                 <Button Text="{helpers:Translate Schedule_MapConfirmBtn}" Command="{Binding ConfirmarPuntoMapaCommand}" BackgroundColor="{StaticResource Primary}" TextColor="Black" FontAttributes="Bold" HeightRequest="50" CornerRadius="8"/>
             </VerticalStackLayout>
         </Grid>

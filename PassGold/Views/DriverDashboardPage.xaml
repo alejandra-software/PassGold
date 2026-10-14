@@ -41,6 +41,27 @@
             <RefreshView IsVisible="{Binding IsTodayView}" IsRefreshing="{Binding IsRefreshing}" Command="{Binding RefreshDashboardCommand}" RefreshColor="{StaticResource Primary}">
                 <ScrollView VerticalOptions="Fill">
                     <VerticalStackLayout Padding="10" Spacing="10">
+
+                        <!-- 📡 FRANJA DE RASTREO: el GPS arranca solo; aquí el chofer ve que está
+                             compartiendo, toca para ver mapa + pasajeros, o finaliza. -->
+                        <Border IsVisible="{Binding MostrarBannerRastreo}" StrokeThickness="0" StrokeShape="RoundRectangle 12" Padding="15,12"
+                                BackgroundColor="{Binding CompartiendoAhora, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#1B5E20|#5D4037'}">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding TocarBannerRastreoCommand}"/>
+                            </Border.GestureRecognizers>
+                            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="10">
+                                <VerticalStackLayout Grid.Column="0" Spacing="3" VerticalOptions="Center">
+                                    <Label Text="{Binding TextoBannerRastreo}" FontSize="14" FontAttributes="Bold" TextColor="White"/>
+                                    <Label Text="{Binding EstadoRastreo}" FontSize="12" TextColor="#E8F5E9" IsVisible="{Binding CompartiendoAhora}"/>
+                                    <Label Text="{Binding SubtextoBannerRastreo}" FontSize="11" TextColor="#C8E6C9" IsVisible="{Binding CompartiendoAhora}"/>
+                                </VerticalStackLayout>
+                                <Button Grid.Column="1" Text="{helpers:Translate Dashboard_FinishBtn}" IsVisible="{Binding CompartiendoAhora}"
+                                        Command="{Binding FinalizarRastreoCommand}" VerticalOptions="Center"
+                                        HeightRequest="38" CornerRadius="8" Padding="12,0" FontSize="12" FontAttributes="Bold"
+                                        BackgroundColor="#FFFFFF" TextColor="#1B5E20"/>
+                            </Grid>
+                        </Border>
+
                         <Label IsVisible="{Binding HasViajeEnCurso, Converter={StaticResource InvertedBoolConverter}}" Text="{helpers:Translate Dashboard_NoTripsToday}" HorizontalOptions="Center" Margin="0,20" TextColor="{AppThemeBinding Light={StaticResource LightHint}, Dark={StaticResource DarkHint}}"/>
 
                         <VerticalStackLayout IsVisible="{Binding HasViajeEnCurso}" Spacing="10">
@@ -50,7 +71,7 @@
                                     <DataTemplate>
                                         <Border BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Stroke="{StaticResource Primary}" StrokeThickness="2" StrokeShape="RoundRectangle 12" Padding="20">
                                             <Border.GestureRecognizers>
-                                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:DriverDashboardViewModel}}, Path=VerDetalleViajeCommand}" CommandParameter="{Binding IdAsignacion}"/>
+                                                <TapGestureRecognizer Command="{Binding AbrirCommand}" CommandParameter="{Binding IdAsignacion}"/>
                                             </Border.GestureRecognizers>
                                             <Grid ColumnDefinitions="Auto, *">
                                                 <Border Grid.Column="0" WidthRequest="60" HeightRequest="60" StrokeShape="RoundRectangle 10" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" Margin="0,0,15,0" VerticalOptions="Center">
@@ -63,7 +84,7 @@
                                                     <Label Text="{Binding HoraContextual}" FontAttributes="Bold" FontSize="18" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
                                                     <HorizontalStackLayout Spacing="10" Margin="0,5,0,0">
                                                         <Label Text="{Binding PlacaMicrobus}" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
-                                                        <Label Text="{Binding OcupacionActual, StringFormat='{0} Pasajeros'}" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                                                        <Label Text="{Binding OcupacionActual, StringFormat={helpers:Translate Driver_PassengersFormat}}" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
                                                     </HorizontalStackLayout>
                                                 </VerticalStackLayout>
                                             </Grid>
@@ -76,6 +97,11 @@
                         <VerticalStackLayout IsVisible="{Binding HasProximoViajeHoy}" Spacing="10">
                             <Label Text="{helpers:Translate Dashboard_NextTrip}" FontSize="15" TextColor="{AppThemeBinding Light={StaticResource LightHint}, Dark={StaticResource DarkHint}}" Margin="10,0"/>
                             <Border BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeThickness="1" StrokeShape="RoundRectangle 12" Padding="15">
+                                <!-- Tocar el próximo viaje también abre la pantalla para iniciarlo
+                                     (por si el chofer sale unos minutos antes de la hora) -->
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding ProximoViajeHoy.AbrirCommand}" CommandParameter="{Binding ProximoViajeHoy.IdAsignacion}"/>
+                                </Border.GestureRecognizers>
                                 <Grid ColumnDefinitions="Auto, *">
                                     <Label Grid.Column="0" Text="🕐" FontSize="24" Margin="0,0,15,0" VerticalOptions="Center"/>
                                     <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
@@ -125,7 +151,7 @@
                         <VerticalStackLayout Grid.Column="0" Spacing="5" Margin="0,45,0,0" BindableLayout.ItemsSource="{Binding TramosDelDia}">
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate>
-                                    <Border HeightRequest="160" BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeThickness="0" StrokeShape="RoundRectangle 8,0,0,8" Padding="5">
+                                    <Border HeightRequest="{Binding AltoFila}" BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeThickness="0" StrokeShape="RoundRectangle 8,0,0,8" Padding="5">
                                         <Label Text="{Binding HoraFija}" FontSize="12" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}" HorizontalOptions="Center" VerticalOptions="Center" HorizontalTextAlignment="Center"/>
                                     </Border>
                                 </DataTemplate>
@@ -150,45 +176,34 @@
                                             <HorizontalStackLayout BindableLayout.ItemsSource="{Binding ViajesDeLaSemana}" Spacing="5">
                                                 <BindableLayout.ItemTemplate>
                                                     <DataTemplate>
-                                                        <!--  FIX: antes este Border bindeaba ChoferInfo/IdAsignacion/ColorFondo/TipoViajeBadge
-                                                             directo sobre el BloqueViaje, que NO tiene esas propiedades (solo tiene
-                                                             TieneViaje y Opciones). Por eso IdAsignacion resolvía a null, el botón
-                                                             "Editar" navegaba con id=null, no encontraba nada en _asignacionesCacheadas,
-                                                             y no pasaba nada al tocarlo. Ahora se agrega el BindableLayout que faltaba
-                                                             sobre "Opciones" (ObservableCollection<OpcionViajeChofer>), que sí tiene esas
-                                                             propiedades. De paso, esto también soporta mostrar varios microbuses de apoyo
-                                                             apilados si hay más de uno en el mismo bloque de día/hora. -->
-                                                        <Border WidthRequest="180" HeightRequest="160" StrokeShape="RoundRectangle 8" StrokeThickness="0">
-                                                            <Grid>
-                                                                <ScrollView IsVisible="{Binding TieneViaje}">
-                                                                    <VerticalStackLayout Spacing="4" BindableLayout.ItemsSource="{Binding Opciones}">
-                                                                        <BindableLayout.ItemTemplate>
-                                                                            <DataTemplate>
-                                                                                <Border BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Stroke="{StaticResource Primary}" StrokeThickness="1" Padding="5">
-                                                                                    <Border.GestureRecognizers>
-                                                                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:DriverDashboardViewModel}}, Path=VerDetalleViajeCommand}" CommandParameter="{Binding IdAsignacion}"/>
-                                                                                    </Border.GestureRecognizers>
-                                                                                    <Border BackgroundColor="{Binding ColorFondo}" StrokeThickness="0" StrokeShape="RoundRectangle 4" Padding="5">
-                                                                                        <Grid RowDefinitions="Auto, Auto">
-                                                                                            <HorizontalStackLayout Grid.Row="0" Spacing="5">
-                                                                                                <Label Text="{Binding ChoferInfo}" FontSize="12" FontAttributes="Bold" TextColor="White" LineBreakMode="TailTruncation" VerticalOptions="Center"/>
-                                                                                                <Border BackgroundColor="#222222" StrokeThickness="0" StrokeShape="RoundRectangle 4" Padding="4,2" VerticalOptions="Center">
-                                                                                                    <Label Text="{Binding TipoViajeBadge}" FontSize="9" FontAttributes="Bold" TextColor="White"/>
-                                                                                                </Border>
-                                                                                            </HorizontalStackLayout>
-                                                                                            <HorizontalStackLayout Grid.Row="1" Spacing="5" Margin="0,5,0,0">
-                                                                                                <Button Text="✏️ Editar" IsVisible="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:DriverDashboardViewModel}}, Path=CanScheduleTrips}" Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:DriverDashboardViewModel}}, Path=NavegarAEdicionCommand}" CommandParameter="{Binding IdAsignacion}" HeightRequest="25" FontSize="10" CornerRadius="4" BackgroundColor="#FFF3E0" TextColor="#D32F2F" Padding="5,0"/>
-                                                                                                <Button Text="Detalle" Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:DriverDashboardViewModel}}, Path=VerDetalleViajeCommand}" CommandParameter="{Binding IdAsignacion}" HeightRequest="25" FontSize="10" CornerRadius="4" BackgroundColor="#E0F7FA" TextColor="#00796B" Padding="5,0"/>
-                                                                                            </HorizontalStackLayout>
-                                                                                        </Grid>
-                                                                                    </Border>
+                                                        <!-- 🔧 Antes: un ScrollView dentro de CADA celda (7 por fila) y 4
+                                                             búsquedas RelativeSource por tarjeta. Era lo que más tardaba en
+                                                             dibujarse. Ahora la fila crece según las unidades y cada tarjeta
+                                                             trae sus propios comandos. -->
+                                                        <Border WidthRequest="180" HeightRequest="{Binding AltoFila}" StrokeShape="RoundRectangle 8" StrokeThickness="0"
+                                                                BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}">
+                                                            <VerticalStackLayout Spacing="4" Padding="4" BindableLayout.ItemsSource="{Binding Opciones}">
+                                                                <BindableLayout.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <Border BackgroundColor="{Binding ColorFondo}" Stroke="{StaticResource Primary}" StrokeThickness="1" StrokeShape="RoundRectangle 6" Padding="6">
+                                                                            <Border.GestureRecognizers>
+                                                                                <TapGestureRecognizer Command="{Binding DetalleCommand}" CommandParameter="{Binding IdAsignacion}"/>
+                                                                            </Border.GestureRecognizers>
+                                                                            <Grid RowDefinitions="Auto, Auto, Auto" ColumnDefinitions="*, Auto" ColumnSpacing="4">
+                                                                                <Label Grid.Row="0" Grid.Column="0" Text="{Binding ChoferInfo}" FontSize="12" FontAttributes="Bold" TextColor="White" LineBreakMode="TailTruncation" MaxLines="1" VerticalOptions="Center"/>
+                                                                                <Border Grid.Row="0" Grid.Column="1" BackgroundColor="#222222" StrokeThickness="0" StrokeShape="RoundRectangle 4" Padding="4,2" VerticalOptions="Center">
+                                                                                    <Label Text="{Binding TipoViajeBadge}" FontSize="9" FontAttributes="Bold" TextColor="White"/>
                                                                                 </Border>
-                                                                            </DataTemplate>
-                                                                        </BindableLayout.ItemTemplate>
-                                                                    </VerticalStackLayout>
-                                                                </ScrollView>
-                                                                <Border IsVisible="{Binding TieneViaje, Converter={StaticResource InvertedBoolConverter}}" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" StrokeThickness="0" />
-                                                            </Grid>
+                                                                                <Label Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding PlacaInfo}" FontSize="11" TextColor="White" LineBreakMode="TailTruncation" MaxLines="1"/>
+                                                                                <HorizontalStackLayout Grid.Row="2" Grid.ColumnSpan="2" Spacing="5" Margin="0,4,0,0">
+                                                                                    <Button Text="{helpers:Translate Driver_EditBtn}" IsVisible="{Binding PuedeEditar}" Command="{Binding EditarCommand}" CommandParameter="{Binding IdAsignacion}" HeightRequest="25" FontSize="10" CornerRadius="4" BackgroundColor="#FFF3E0" TextColor="#D32F2F" Padding="5,0"/>
+                                                                                    <Button Text="{helpers:Translate Driver_DetailBtn}" Command="{Binding DetalleCommand}" CommandParameter="{Binding IdAsignacion}" HeightRequest="25" FontSize="10" CornerRadius="4" BackgroundColor="#E0F7FA" TextColor="#00796B" Padding="5,0"/>
+                                                                                </HorizontalStackLayout>
+                                                                            </Grid>
+                                                                        </Border>
+                                                                    </DataTemplate>
+                                                                </BindableLayout.ItemTemplate>
+                                                            </VerticalStackLayout>
                                                         </Border>
                                                     </DataTemplate>
                                                 </BindableLayout.ItemTemplate>

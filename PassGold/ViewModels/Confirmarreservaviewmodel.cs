@@ -6,311 +6,454 @@ using PassGold.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Controls.Maps;
-using Microsoft.Maui.Devices.Sensors;
 using Microsoft.Maui.Networking;
 using Microsoft.Maui.Maps;
+using Microsoft.Maui.ApplicationModel;
+using Microsoft.Maui.Devices.Sensors;
+using Operador = Supabase.Postgrest.Constants.Operator;
 
 namespace PassGold.ViewModels;
 
+// Un lugar que el pasajero ya usó o guardó (para no buscarlo a mano cada vez)
+public class LugarFrecuente
+{
+    public string Nombre { get; set; } = "";
+    public double Latitud { get; set; }
+    public double Longitud { get; set; }
+    public DateTime UltimoUso { get; set; }
+    // true = lado de la casa (recogida en ida / bajada en regreso)
+    // false = punto alterno (bajada en ida / recogida en regreso), ej. Metrocentro
+    public bool EsCasa { get; set; }
+    public string Texto => EsCasa ? $"🏠 {Nombre}" : $"📍 {Nombre}";
+}
+
+// Una opción de punto en la universidad (meta o parada oficial del chofer)
+public class PuntoOficial
+{
+    public string Nombre { get; set; } = "";
+    public double Latitud { get; set; }
+    public double Longitud { get; set; }
+    public string Texto => $"🏁 {Nombre}";
+}
+
+// 🔧 REDISEÑO "ESPEJO": el pasajero marca DOS lugares y la app los pone al derecho
+// o al revés según la dirección del viaje:
+//   🏠 su casa (ej. Colonia San Rafael)
+//   🚩 el punto oficial del chofer o uno alterno (ej. Metrocentro)
+//   IDA:     🟢 recoge en San Rafael  →  🔵 deja en Metrocentro
+//   REGRESO: 🟢 recoge en Metrocentro →  🔵 deja en San Rafael
+// Así se pueden reservar llegadas y salidas juntas en un solo paso.
 public partial class ConfirmarReservaViewModel : ObservableObject
 {
     private readonly SupabaseService _supabaseService = SupabaseService.Instance;
-    private readonly List<OpcionViajePasajero> _seleccionesIniciales;
+    private readonly List<OpcionViajePasajero> _selecciones;
 
-    private LocalDatabaseService GetLocalDb() =>
-        Application.Current?.Handler?.MauiContext?.Services.GetService<LocalDatabaseService>() ?? new LocalDatabaseService();
-
+    // Compatibilidad con el resto de la app
     public bool EsIda { get; }
-    public string TituloExtremoFijo => AppResources.PassengerDash_HomeLabel;
-    public string TituloExtremoAlterno => EsIda ? AppResources.PassengerDash_WhereToDropPrompt : AppResources.PassengerDash_WherePickupPrompt;
+    public bool EsRegreso => !EsIda;
 
     [ObservableProperty] private bool isLoading = true;
     [ObservableProperty] private bool isSaving = false;
-
-    //  Vista satélite/híbrida — se me había olvidado traerla a esta pantalla nueva.
+    [ObservableProperty] private bool isMapExpanded = false;
+    [ObservableProperty] private bool showDetailsPanel = true;
     [ObservableProperty] private MapType currentMapType = MapType.Street;
 
     [RelayCommand]
-    public void ToggleMapType()
-    {
-        CurrentMapType = CurrentMapType == MapType.Street ? MapType.Hybrid : MapType.Street;
-    }
-
-    //  Pestañas Recogida/Bajada — igual que en el mapa del chofer (TripDetailsPage),
-    // para no mostrar los 2 pines mezclados y que quede claro cuál es cuál.
-    [ObservableProperty] private bool viendoRecogida = true;
+    public void ToggleMapExpansion() { IsMapExpanded = !IsMapExpanded; ShowDetailsPanel = !IsMapExpanded; }
 
     [RelayCommand]
-    public void VerRecogida()
+    public void ToggleMapType() => CurrentMapType = CurrentMapType == MapType.Street ? MapType.Hybrid : MapType.Street;
+
+    // ── Qué se está editando: casa o universidad ──
+    [ObservableProperty] private bool editandoCasa = true;
+    public bool EditandoUniversidad => !EditandoCasa;
+
+    partial void OnEditandoCasaChanged(bool value)
     {
-        ViendoRecogida = true;
-        SincronizarPinActivo();
+        OnPropertyChanged(nameof(EditandoUniversidad));
+        OnPropertyChanged(nameof(TextoAyudaMapa));
+        OnPropertyChanged(nameof(TextoAyudaLugares));
+        MostrarLugaresDelLado();
         RedibujarPines();
     }
 
-    [RelayCommand]
-    public void VerBajada()
-    {
-        ViendoRecogida = false;
-        SincronizarPinActivo();
-        RedibujarPines();
-    }
+    [RelayCommand] public void VerCasa() => EditandoCasa = true;
+    [RelayCommand] public void VerUniversidad() => EditandoCasa = false;
 
-    // En Ida: Recogida = Casa (fija), Bajada = Alterno. En Regreso: al revés.
-    // TocandoCasa decide qué pin recibe el próximo toque del mapa.
-    private void SincronizarPinActivo()
-    {
-        TocandoCasa = (ViendoRecogida == EsIda);
-    }
+    public string TextoAyudaMapa => EditandoCasa
+        ? AppResources.Confirm_MapHintHome
+        : AppResources.Confirm_MapHintAlt;
 
-    // Info del chofer/vehiculo
-    [ObservableProperty] private string nombreChofer = "";
-    [ObservableProperty] private string fotoChofer = "";
-    [ObservableProperty] private string placaVehiculo = "";
-    [ObservableProperty] private string fotoVehiculo = "";
-    [ObservableProperty] private string telefonoChofer = "";
-    [ObservableProperty] private bool hayTelefonoChofer = false;
+    public string TextoAyudaLugares => EditandoCasa
+        ? AppResources.Confirm_PlacesHome
+        : AppResources.Confirm_PlacesAlt;
 
-    // Pin de casa
+    // ── Resumen de lo que se va a reservar ──
+    [ObservableProperty] private string resumenSeleccion = "";
+
+    // ── Casa / punto personal ──
     [ObservableProperty] private double? latCasa;
     [ObservableProperty] private double? lngCasa;
     [ObservableProperty] private bool casaEsNueva = false;
+    // Referencia para el chofer ("Portón negro frente a la tienda")
+    [ObservableProperty] private string aliasUbicacionPersonal = "";
 
-    // Pin alterno
+    // ── Punto en la universidad ──
     [ObservableProperty] private string modoAlterno = "MetaOficial";
     [ObservableProperty] private double? latAlterno;
     [ObservableProperty] private double? lngAlterno;
     [ObservableProperty] private string textoAlterno = "";
-    [ObservableProperty] private string nuevoAliasAlterno = "";
     [ObservableProperty] private bool guardarNuevoAlternoEnHistorial = true;
 
-    [ObservableProperty] private bool tocandoCasa = false;
+    public string TabCasaTexto => LatCasa.HasValue ? AppResources.Confirm_TabHome + " ✓" : AppResources.Confirm_TabHome;
+    public string TabUniversidadTexto => LatAlterno.HasValue ? AppResources.Confirm_TabAlt + " ✓" : AppResources.Confirm_TabAlt;
+    partial void OnLatCasaChanged(double? value) { OnPropertyChanged(nameof(TabCasaTexto)); ActualizarEspejo(); }
+    partial void OnLatAlternoChanged(double? value) { OnPropertyChanged(nameof(TabUniversidadTexto)); ActualizarEspejo(); }
+    partial void OnAliasUbicacionPersonalChanged(string value) => ActualizarEspejo();
+    partial void OnTextoAlternoChanged(string value) => ActualizarEspejo();
 
-    [ObservableProperty] private bool hayMetaOficialDisponible = false;
-    [ObservableProperty] private string textoBotonMetaOficial = "";
-    private double? _metaOficialLat, _metaOficialLng;
+    // 🆕 Vista previa del "espejo": cómo quedan recogida y bajada en cada dirección
+    [ObservableProperty] private string espejoIda = "";
+    [ObservableProperty] private string espejoRegreso = "";
+    public bool HayIda => _selecciones.Any(s => s.EsIda);
+    public bool HayRegreso => _selecciones.Any(s => !s.EsIda);
 
-    public ObservableCollection<UbicacionPasajero> MisUbicaciones { get; } = new();
-    public ObservableCollection<ViajeParada> ParadasOficiales { get; } = new();
-    public bool HayVariasParadasOficiales => ParadasOficiales.Count > 1;
+    private void ActualizarEspejo()
+    {
+        string casa = LatCasa.HasValue ? (string.IsNullOrWhiteSpace(AliasUbicacionPersonal) ? AppResources.Confirm_MissingAddressText : AliasUbicacionPersonal.Trim()) : AppResources.Confirm_MissingAddress;
+        string otro = LatAlterno.HasValue && !string.IsNullOrWhiteSpace(TextoAlterno) ? TextoAlterno.Trim() : AppResources.Confirm_MissingPoint;
+        EspejoIda = AppResources.F(AppResources.Confirm_MirrorPickup, casa) + "\n" + AppResources.F(AppResources.Confirm_MirrorDropoff, otro);
+        EspejoRegreso = AppResources.F(AppResources.Confirm_MirrorPickup, otro) + "\n" + AppResources.F(AppResources.Confirm_MirrorDropoff, casa);
+    }
+
+    public ObservableCollection<PuntoOficial> PuntosOficiales { get; } = new();
+    public bool HayPuntosOficiales => PuntosOficiales.Count > 0;
+
+    // 🆕 Historial separado por lado: lo que se muestra depende de la pestaña activa
+    public ObservableCollection<LugarFrecuente> MisLugares { get; } = new();
+    public bool HayLugares => MisLugares.Count > 0;
+    private List<LugarFrecuente> _lugaresCasa = new();
+    private List<LugarFrecuente> _lugaresAlternos = new();
+
+    private void MostrarLugaresDelLado()
+    {
+        MisLugares.Clear();
+        foreach (var l in (EditandoCasa ? _lugaresCasa : _lugaresAlternos).Take(10)) MisLugares.Add(l);
+    }
 
     public ObservableCollection<Pin> PinesMapa { get; } = new();
 
-    [ObservableProperty] private string alcanceSeleccionado = "";
-    public ObservableCollection<string> OpcionesAlcance { get; } = new();
+    // ── Repetición semanal ──
+    // Textos en el idioma de la app (se comparan por igualdad, nunca se guardan en la BD)
+    public static string AlcanceSoloElegidos => AppResources.Confirm_ScopeOnlyChosen;
+    public static string AlcanceUnMes => AppResources.Confirm_ScopeOneMonth;
+    public static string AlcanceCiclo => AppResources.Confirm_ScopeCycle;
+    public static string AlcancePersonalizado => AppResources.Confirm_ScopeCustom;
 
-    // Rango de fecha libre: en vez de solo 4 botones fijos, se puede elegir
-    // hasta qué fecha exacta repetir la reserva — acotado a lo que realmente
-    // dure el ciclo del viaje (fecha_fin del Viaje), para no poder "reservar"
-    // en un mes donde ese viaje ya no existe.
+    public ObservableCollection<string> OpcionesAlcance { get; } = new() { AlcanceSoloElegidos, AlcanceUnMes, AlcanceCiclo, AlcancePersonalizado };
+    [ObservableProperty] private string alcanceSeleccionado = AlcanceSoloElegidos;
     [ObservableProperty] private bool usandoRangoPersonalizado = false;
-    [ObservableProperty] private DateTime fechaHastaPersonalizada = DateTime.Today.AddDays(14);
+    [ObservableProperty] private DateTime fechaHastaPersonalizada = DateTime.Today.AddDays(28);
     [ObservableProperty] private DateTime fechaMinimaRango = DateTime.Today;
     [ObservableProperty] private DateTime fechaMaximaRango = DateTime.Today.AddMonths(6);
 
+    // 🔧 Antes el selector cambiaba el alcance pero nada mostraba el calendario de
+    // "hasta qué fecha": por eso no se podía elegir un rango.
+    partial void OnAlcanceSeleccionadoChanged(string value) => UsandoRangoPersonalizado = value == AlcancePersonalizado;
+
     public ConfirmarReservaViewModel(List<OpcionViajePasajero> seleccionesIniciales)
     {
-        _seleccionesIniciales = seleccionesIniciales;
-        EsIda = seleccionesIniciales.FirstOrDefault()?.EsIda ?? true;
+        _selecciones = seleccionesIniciales ?? new List<OpcionViajePasajero>();
+        EsIda = _selecciones.FirstOrDefault()?.EsIda ?? true;
+        MisLugares.CollectionChanged += (s, e) => OnPropertyChanged(nameof(HayLugares));
+        PuntosOficiales.CollectionChanged += (s, e) => OnPropertyChanged(nameof(HayPuntosOficiales));
+        ResumenSeleccion = ArmarResumen(_selecciones);
 
-        int diasDistintos = seleccionesIniciales.Select(o => o.FechaAsignacion.DayOfWeek).Distinct().Count();
-        if (diasDistintos == 1) OpcionesAlcance.Add(AppResources.PassengerDash_ScopeOnlyThisDay);
-        OpcionesAlcance.Add(AppResources.PassengerDash_ScopeThisWeek);
-        OpcionesAlcance.Add(AppResources.PassengerDash_ScopeThisMonth);
-        OpcionesAlcance.Add(AppResources.PassengerDash_ScopeRestOfCycle);
-        OpcionesAlcance.Add(AppResources.PassengerDash_ScopeCustomRange);
-        AlcanceSeleccionado = OpcionesAlcance.First();
-
-        _ = CargarDatosAsync();
+        Task.Run(CargarDatosAsync);
     }
 
-    [RelayCommand]
-    public void SeleccionarAlcance(string opcion)
+    private static string ArmarResumen(List<OpcionViajePasajero> sel)
     {
-        if (string.IsNullOrEmpty(opcion)) return;
-        AlcanceSeleccionado = opcion;
-        UsandoRangoPersonalizado = opcion == AppResources.PassengerDash_ScopeCustomRange;
+        if (sel.Count == 0) return "";
+        var cultura = AppResources.Culture;
+        var partes = sel.OrderBy(o => o.FechaAsignacion)
+            .Select(o => $"{(o.EsIda ? "🏫" : "🏠")} {o.FechaAsignacion.ToString("ddd d", cultura)} {o.FechaAsignacion.ToString("h:mm tt", cultura)}"
+                         + (string.IsNullOrWhiteSpace(o.NombreChofer) ? "" : $" ({o.NombreChofer})"))
+            .ToList();
+        string encabezado = sel.Count == 1 ? AppResources.Confirm_SummaryOne : AppResources.F(AppResources.Confirm_SummaryMany, sel.Count);
+        return $"{encabezado}\n{string.Join("  ·  ", partes)}\n{AppResources.Confirm_SummaryLegend}";
     }
+
+    // ───────────────────────── Carga ─────────────────────────
 
     private async Task CargarDatosAsync()
     {
-        IsLoading = true;
-
-        string currentUserId = "";
-        var authUser = _supabaseService.GetCurrentUser();
-        if (authUser != null && !string.IsNullOrEmpty(authUser.Id)) currentUserId = authUser.Id;
-        else { var sesionLocal = await GetLocalDb().ObtenerSesionActivaAsync(); if (sesionLocal != null) currentUserId = sesionLocal.Id; }
-
-        if (!string.IsNullOrEmpty(currentUserId))
+        try
         {
-            var misUb = await _supabaseService.GetUbicacionesPasajeroAsync(currentUserId);
-            MisUbicaciones.Clear();
-            foreach (var u in misUb.OrderByDescending(x => x.CreadoEn)) MisUbicaciones.Add(u);
+            var yo = _supabaseService.GetCurrentUser();
+            string miId = yo?.Id ?? "";
 
-            var casaGuardada = MisUbicaciones.FirstOrDefault(u => u.Alias == AppResources.PassengerDash_HomeLabel);
-            if (casaGuardada != null)
+            // 1) Puntos oficiales en la universidad (paradas o meta de cada viaje elegido)
+            var oficiales = new List<PuntoOficial>();
+            foreach (var idViaje in _selecciones.Select(s => s.IdViajeBase).Distinct())
             {
-                LatCasa = casaGuardada.Latitud;
-                LngCasa = casaGuardada.Longitud;
-                CasaEsNueva = false;
+                var paradas = await _supabaseService.GetParadasByViajeAsync(idViaje);
+                foreach (var p in paradas.OrderBy(p => p.Orden))
+                    if (p.Latitud.HasValue && p.Longitud.HasValue)
+                        oficiales.Add(new PuntoOficial { Nombre = p.NombreLugar, Latitud = p.Latitud.Value, Longitud = p.Longitud.Value });
+
+                if (paradas.Count == 0)
+                {
+                    var viaje = await _supabaseService.GetViajeByIdAsync(idViaje);
+                    if (viaje?.MetaLatitud != null && viaje.MetaLongitud != null)
+                        oficiales.Add(new PuntoOficial { Nombre = viaje.MetaTexto ?? AppResources.Confirm_OfficialPointDefault, Latitud = viaje.MetaLatitud.Value, Longitud = viaje.MetaLongitud.Value });
+
+                    if (viaje?.FechaFin != null)
+                    {
+                        var fin = viaje.FechaFin.Value.Date;
+                        MainThread.BeginInvokeOnMainThread(() => { if (fin < FechaMaximaRango) FechaMaximaRango = fin < FechaMinimaRango ? FechaMinimaRango : fin; });
+                    }
+                }
             }
-            else
+            oficiales = oficiales.GroupBy(o => o.Nombre.Trim().ToLowerInvariant()).Select(g => g.First()).ToList();
+
+            // 2) Historial: lugares guardados + puntos de reservas anteriores
+            var lugares = new List<LugarFrecuente>();
+            LugarFrecuente? casaSugerida = null;
+            LugarFrecuente? uSugerida = null;
+
+            if (!string.IsNullOrEmpty(miId))
             {
-                CasaEsNueva = true;
-                ViendoRecogida = EsIda; // la pestaña donde vive la casa, según la dirección
-                TocandoCasa = true;
+                // Tabla de lugares guardados (si existe)
+                var guardados = await _supabaseService.GetUbicacionesPasajeroAsync(miId);
+                foreach (var g in guardados.Where(g => g.Latitud.HasValue && g.Longitud.HasValue))
+                {
+                    lugares.Add(new LugarFrecuente
+                    {
+                        Nombre = string.IsNullOrWhiteSpace(g.Alias) ? g.DireccionTexto : g.Alias,
+                        Latitud = g.Latitud!.Value,
+                        Longitud = g.Longitud!.Value,
+                        UltimoUso = g.CreadoEn,
+                        EsCasa = g.Tipo != "alterno"
+                    });
+                }
+
+                // Reservas anteriores: de acá sale el historial aunque no haya nada guardado
+                var misReservas = await _supabaseService.GetReservasPorPasajeroYRangoAsync(miId, DateTime.Today.AddYears(-1), DateTime.Today.AddYears(1));
+                var idsAsig = misReservas.Select(r => r.IdAsignacion).Distinct().ToList();
+                var asignaciones = idsAsig.Count > 0 ? await _supabaseService.GetAsignacionesByIdsAsync(idsAsig) : new List<Asignacion>();
+                var viajes = asignaciones.Count > 0 ? await _supabaseService.GetViajesByIdsAsync(asignaciones.Select(a => a.IdViaje).Distinct().ToList()) : new List<Viaje>();
+
+                foreach (var r in misReservas.OrderByDescending(r => r.CreadoEn))
+                {
+                    var asig = asignaciones.FirstOrDefault(a => a.Id == r.IdAsignacion);
+                    var viaje = asig != null ? viajes.FirstOrDefault(v => v.Id == asig.IdViaje) : null;
+                    bool esIda = (viaje == null || AppResources.IsInboundTrip(viaje.TipoViaje));
+
+                    LugarFrecuente? recogida = (r.LatitudRecogida.HasValue && r.LongitudRecogida.HasValue)
+                        ? new LugarFrecuente { Nombre = Limpiar(r.PuntoRecogidaTexto), Latitud = r.LatitudRecogida.Value, Longitud = r.LongitudRecogida.Value, UltimoUso = r.CreadoEn }
+                        : null;
+                    LugarFrecuente? bajada = (r.LatitudBajada.HasValue && r.LongitudBajada.HasValue)
+                        ? new LugarFrecuente { Nombre = Limpiar(r.PuntoBajadaTexto), Latitud = r.LatitudBajada.Value, Longitud = r.LongitudBajada.Value, UltimoUso = r.CreadoEn }
+                        : null;
+
+                    // Espejo: en la ida la casa es la recogida; en el regreso, la bajada
+                    var casa = esIda ? recogida : bajada;
+                    var u = esIda ? bajada : recogida;
+                    if (casa != null) casa.EsCasa = true;
+                    if (u != null) u.EsCasa = false;
+                    if (casa != null) { lugares.Add(casa); casaSugerida ??= casa; }
+                    if (u != null) { lugares.Add(u); uSugerida ??= u; }
+                }
             }
-        }
 
-        var primeraOpcion = _seleccionesIniciales.First();
-
-        var asignacionInfo = await _supabaseService.GetAsignacionByIdAsync(primeraOpcion.IdAsignacion);
-        if (asignacionInfo != null)
-        {
-            var chofer = await _supabaseService.GetUserDataAsync(asignacionInfo.IdChofer);
-            if (chofer != null)
+            // Sin repetidos (dos puntos a menos de ~40 m son el mismo lugar), cada lado por separado.
+            // De los alternos se quitan los puntos oficiales, que ya tienen sus propios botones.
+            List<LugarFrecuente> SinRepetidos(IEnumerable<LugarFrecuente> origen)
             {
-                NombreChofer = chofer.Nombre;
-                FotoChofer = chofer.FotoPerfil ?? "";
-                TelefonoChofer = chofer.Telefono ?? "";
-                HayTelefonoChofer = !string.IsNullOrWhiteSpace(TelefonoChofer);
+                var lista = new List<LugarFrecuente>();
+                foreach (var l in origen.Where(l => !string.IsNullOrWhiteSpace(l.Nombre)).OrderByDescending(l => l.UltimoUso))
+                    if (!lista.Any(x => DistanciaMetros(x.Latitud, x.Longitud, l.Latitud, l.Longitud) < 40))
+                        lista.Add(l);
+                return lista;
             }
+            var lugaresCasa = SinRepetidos(lugares.Where(l => l.EsCasa));
+            var lugaresAlternos = SinRepetidos(lugares.Where(l => !l.EsCasa))
+                .Where(l => !oficiales.Any(o => DistanciaMetros(o.Latitud, o.Longitud, l.Latitud, l.Longitud) < 40))
+                .ToList();
 
-            var vehiculo = await _supabaseService.GetVehiculoByIdAsync(asignacionInfo.IdVehiculo);
-            if (vehiculo != null)
+            var casaGuardada = casaSugerida ?? lugaresCasa.FirstOrDefault();
+
+            MainThread.BeginInvokeOnMainThread(() =>
             {
-                PlacaVehiculo = vehiculo.Placa;
-                FotoVehiculo = vehiculo.FotoUrl ?? "";
-            }
+                PuntosOficiales.Clear();
+                foreach (var o in oficiales) PuntosOficiales.Add(o);
+
+                _lugaresCasa = lugaresCasa;
+                _lugaresAlternos = lugaresAlternos;
+
+                // Casa: la última que usó (así no tiene que buscarla cada vez)
+                if (casaGuardada != null)
+                {
+                    LatCasa = casaGuardada.Latitud; LngCasa = casaGuardada.Longitud;
+                    UsarNombreDeCasa(casaGuardada.Nombre);
+                    CasaEsNueva = false;
+                }
+                else
+                {
+                    CasaEsNueva = true;
+                }
+
+                // Punto oficial / alterno: el que usó la última vez (ej. siempre se baja en
+                // Metrocentro); si nunca reservó, el punto oficial del chofer.
+                var oficialCercano = uSugerida == null ? null : oficiales.FirstOrDefault(o => DistanciaMetros(o.Latitud, o.Longitud, uSugerida.Latitud, uSugerida.Longitud) < 40);
+                if (oficialCercano != null) UsarPuntoOficial(oficialCercano);
+                else if (uSugerida != null) { ModoAlterno = "Guardada"; LatAlterno = uSugerida.Latitud; LngAlterno = uSugerida.Longitud; TextoAlterno = uSugerida.Nombre; }
+                else if (oficiales.Count > 0) UsarPuntoOficial(oficiales[0]);
+
+                // Empezar por lo que falta
+                EditandoCasa = !LatCasa.HasValue || LatAlterno.HasValue;
+                MostrarLugaresDelLado();
+                ActualizarEspejo();
+                IsLoading = false;
+                RedibujarPines();
+            });
         }
-
-        var paradas = await _supabaseService.GetParadasByViajeAsync(primeraOpcion.IdViajeBase);
-        ParadasOficiales.Clear();
-        foreach (var p in paradas) ParadasOficiales.Add(p);
-        OnPropertyChanged(nameof(HayVariasParadasOficiales));
-
-        //  Siempre se trae el Viaje: además de servir de respaldo para la meta
-        // oficial (si no hay paradas guardadas), da los límites reales del ciclo
-        // (fecha_inicio/fecha_fin) para acotar el selector de rango personalizado.
-        var viajeBase = await _supabaseService.GetViajeByIdAsync(primeraOpcion.IdViajeBase);
-        if (viajeBase != null)
+        catch (Exception ex)
         {
-            var hoy = DateTime.Today;
-            FechaMinimaRango = primeraOpcion.FechaAsignacion.Date > hoy ? primeraOpcion.FechaAsignacion.Date : hoy;
-            FechaMaximaRango = viajeBase.FechaFin ?? hoy.AddMonths(6);
-            if (FechaMaximaRango < FechaMinimaRango) FechaMaximaRango = FechaMinimaRango;
-
-            FechaHastaPersonalizada = FechaMinimaRango.AddDays(14) < FechaMaximaRango ? FechaMinimaRango.AddDays(14) : FechaMaximaRango;
+            CrashLogger.Guardar(ex, "ConfirmarReservaViewModel.CargarDatosAsync");
+            MainThread.BeginInvokeOnMainThread(() => IsLoading = false);
         }
+    }
 
-        if (ParadasOficiales.Count == 1)
-        {
-            _metaOficialLat = ParadasOficiales[0].Latitud;
-            _metaOficialLng = ParadasOficiales[0].Longitud;
-            TextoBotonMetaOficial = $"🏁 {ParadasOficiales[0].NombreLugar}";
-            HayMetaOficialDisponible = _metaOficialLat != null;
-        }
-        else if (ParadasOficiales.Count == 0 && viajeBase?.MetaLatitud != null && viajeBase.MetaLongitud != null)
-        {
-            _metaOficialLat = viajeBase.MetaLatitud;
-            _metaOficialLng = viajeBase.MetaLongitud;
-            TextoBotonMetaOficial = string.IsNullOrWhiteSpace(viajeBase.MetaTexto) ? AppResources.PassengerDash_OfficialMetaOption : $"🏁 {viajeBase.MetaTexto}";
-            HayMetaOficialDisponible = true;
-        }
+    private static string Limpiar(string? texto)
+    {
+        if (string.IsNullOrWhiteSpace(texto)) return "";
+        return texto.Replace("⭐", "").Replace("🏁", "").Replace("📍", "").Trim();
+    }
 
-        if (HayMetaOficialDisponible && ParadasOficiales.Count <= 1)
-        {
-            SeleccionarMetaOficial();
-        }
+    private static double DistanciaMetros(double lat1, double lon1, double lat2, double lon2)
+    {
+        double r = 6371000, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
+        double a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                   Math.Cos(lat1 * Math.PI / 180) * Math.Cos(lat2 * Math.PI / 180) * Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        return r * 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+    }
 
-        IsLoading = false;
+    // ───────────────────────── Elegir lugares ─────────────────────────
+
+    [RelayCommand]
+    public void SeleccionarPuntoOficial(PuntoOficial? punto)
+    {
+        if (punto == null) return;
+        UsarPuntoOficial(punto);
+        EditandoCasa = false;
         RedibujarPines();
     }
 
-    [RelayCommand]
-    public void SeleccionarMetaOficial()
+    private void UsarPuntoOficial(PuntoOficial punto)
     {
-        if (!HayMetaOficialDisponible) return;
         ModoAlterno = "MetaOficial";
-        LatAlterno = _metaOficialLat;
-        LngAlterno = _metaOficialLng;
-        TextoAlterno = TextoBotonMetaOficial;
-        ViendoRecogida = !EsIda;
-        RedibujarPines();
+        LatAlterno = punto.Latitud; LngAlterno = punto.Longitud;
+        TextoAlterno = punto.Nombre;
     }
 
-    [RelayCommand]
-    public void SeleccionarParadaOficial(ViajeParada parada)
+    // ───────────────────────── Dirección clara para el chofer ─────────────────────────
+
+    // 🆕 El chofer ve la lista de TODOS sus pasajeros: si 20 ponen "Mi casa", no
+    // sirve de nada. Estas referencias no se aceptan como dirección.
+    private static readonly string[] ReferenciasVagas =
     {
-        if (parada == null) return;
-        ModoAlterno = "MetaOficial";
-        LatAlterno = parada.Latitud;
-        LngAlterno = parada.Longitud;
-        TextoAlterno = $"🏁 {parada.NombreLugar}";
-        ViendoRecogida = !EsIda;
-        RedibujarPines();
+        "mi casa", "casa", "mi hogar", "hogar", "aqui", "aca", "mi ubicacion", "ubicacion",
+        "ubicacion personal", "mi punto", "punto", "mi direccion", "direccion", "home", "my home",
+        "house", "mi lugar", "lugar", "donde siempre", "el mismo", "la misma", "mi cuarto"
+    };
+
+    public static bool EsReferenciaVaga(string? texto)
+    {
+        if (string.IsNullOrWhiteSpace(texto)) return true;
+        var sinTildes = new string(texto.Normalize(System.Text.NormalizationForm.FormD)
+            .Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+            .ToArray());
+        var limpio = new string(sinTildes.ToLowerInvariant().Where(c => char.IsLetterOrDigit(c) || c == ' ').ToArray());
+        limpio = string.Join(" ", limpio.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        return limpio.Length < 6 || ReferenciasVagas.Contains(limpio);
     }
 
-    [RelayCommand]
-    public void SeleccionarUbicacionGuardada(UbicacionPasajero ubicacion)
-    {
-        if (ubicacion == null) return;
-        ModoAlterno = "Guardada";
-        LatAlterno = ubicacion.Latitud;
-        LngAlterno = ubicacion.Longitud;
-        TextoAlterno = $"⭐ {ubicacion.DireccionTexto}";
-        ViendoRecogida = !EsIda;
-        RedibujarPines();
-    }
+    private string _nombreCasaOriginal = "";
 
-    [RelayCommand]
-    public void ActivarModoMapaParaAlterno()
+    // Si el nombre guardado es vago ("Mi Casa"), se reemplaza por la dirección real
+    // del punto en el mapa, para que el pasajero solo tenga que completarla.
+    private void UsarNombreDeCasa(string nombre)
     {
-        ModoAlterno = "Mapa";
-        TocandoCasa = false;
-        ViendoRecogida = !EsIda; // la pestaña donde vive el punto alterno
-        RedibujarPines();
-    }
-
-    [RelayCommand]
-    public void ActivarEdicionCasa()
-    {
-        TocandoCasa = true;
-        ViendoRecogida = EsIda; // la pestaña donde vive la casa
-        RedibujarPines();
-    }
-
-    // FIX PRINCIPAL: antes esto guardaba el texto del BOTON como si fuera la
-    // direccion real. Ahora hace geocodificacion INVERSA (gratis, sin API key,
-    // mismo Geocoding.Default del resto de la app) para convertir el punto
-    // tocado en una direccion legible de verdad.
-    public async void ProcesarToqueMapa(Location ubicacion)
-    {
-        if (TocandoCasa)
+        if (!EsReferenciaVaga(nombre))
         {
-            LatCasa = ubicacion.Latitude;
-            LngCasa = ubicacion.Longitude;
-            CasaEsNueva = true;
-            RedibujarPines();
+            AliasUbicacionPersonal = nombre;
+            _nombreCasaOriginal = nombre;
+            return;
+        }
+        AliasUbicacionPersonal = "";
+        _nombreCasaOriginal = "";
+        if (LatCasa.HasValue && LngCasa.HasValue)
+        {
+            var punto = new Location(LatCasa.Value, LngCasa.Value);
+            _ = Task.Run(async () =>
+            {
+                string sugerida = Limpiar(await ObtenerDireccionLegibleAsync(punto));
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    if (string.IsNullOrWhiteSpace(AliasUbicacionPersonal) && sugerida != Limpiar(AppResources.ConfirmarReserva_PinSinDireccion))
+                        AliasUbicacionPersonal = sugerida;
+                });
+            });
+        }
+    }
+
+    // Un lugar del historial se aplica a lo que esté activo (casa o universidad)
+    [RelayCommand]
+    public void SeleccionarLugar(LugarFrecuente? lugar)
+    {
+        if (lugar == null) return;
+        if (EditandoCasa)
+        {
+            LatCasa = lugar.Latitud; LngCasa = lugar.Longitud;
+            UsarNombreDeCasa(lugar.Nombre);
+            CasaEsNueva = false;
         }
         else
         {
-            ModoAlterno = "Mapa";
-            LatAlterno = ubicacion.Latitude;
-            LngAlterno = ubicacion.Longitude;
-            TextoAlterno = AppResources.ConfirmarReserva_Ubicando;
-            RedibujarPines();
+            ModoAlterno = "Guardada";
+            LatAlterno = lugar.Latitud; LngAlterno = lugar.Longitud;
+            TextoAlterno = lugar.Nombre;
+        }
+        RedibujarPines();
+    }
 
-            TextoAlterno = await ObtenerDireccionLegibleAsync(ubicacion);
+    public async void ProcesarToqueMapa(Location ubicacion)
+    {
+        if (EditandoCasa)
+        {
+            LatCasa = ubicacion.Latitude; LngCasa = ubicacion.Longitude; CasaEsNueva = true;
+            RedibujarPines();
+            // Si todavía no escribió referencia, se sugiere la dirección (la puede cambiar)
+            if (string.IsNullOrWhiteSpace(AliasUbicacionPersonal))
+                AliasUbicacionPersonal = Limpiar(await ObtenerDireccionLegibleAsync(ubicacion));
+        }
+        else
+        {
+            ModoAlterno = "Mapa"; LatAlterno = ubicacion.Latitude; LngAlterno = ubicacion.Longitude;
+            TextoAlterno = AppResources.ConfirmarReserva_Ubicando; RedibujarPines();
+            TextoAlterno = Limpiar(await ObtenerDireccionLegibleAsync(ubicacion));
             RedibujarPines();
         }
     }
 
-    private async Task<string> ObtenerDireccionLegibleAsync(Location ubicacion)
+    private static async Task<string> ObtenerDireccionLegibleAsync(Location ubicacion)
     {
         try
         {
@@ -322,57 +465,65 @@ public partial class ConfirmarReservaViewModel : ObservableObject
                 if (!string.IsNullOrWhiteSpace(lugar.Thoroughfare)) partes.Add(lugar.Thoroughfare);
                 if (!string.IsNullOrWhiteSpace(lugar.SubLocality)) partes.Add(lugar.SubLocality);
                 if (!string.IsNullOrWhiteSpace(lugar.Locality)) partes.Add(lugar.Locality);
-                if (partes.Count > 0) return $"📍 {string.Join(", ", partes)}";
+                if (partes.Count > 0) return string.Join(", ", partes);
             }
         }
         catch { }
         return AppResources.ConfirmarReserva_PinSinDireccion;
     }
 
+    // Se muestran los dos puntos; el que se está editando va primero (el mapa se centra en él)
     private void RedibujarPines()
     {
+        var casa = (LatCasa.HasValue && LngCasa.HasValue)
+            ? new Pin { Label = $"🏠 {(string.IsNullOrWhiteSpace(AliasUbicacionPersonal) ? AppResources.Confirm_MyHomePin : AliasUbicacionPersonal)}", Type = PinType.SavedPin, Location = new Location(LatCasa.Value, LngCasa.Value) }
+            : null;
+        var u = (LatAlterno.HasValue && LngAlterno.HasValue)
+            ? new Pin { Label = $"🏫 {TextoAlterno}", Type = PinType.Place, Location = new Location(LatAlterno.Value, LngAlterno.Value) }
+            : null;
+
         PinesMapa.Clear();
-
-        // Solo se muestra en el mapa lo que pertenece a la pestaña activa.
-        bool mostrarCasa = (ViendoRecogida == EsIda);
-        bool mostrarAlterno = !mostrarCasa;
-
-        if (mostrarCasa && LatCasa.HasValue && LngCasa.HasValue)
-        {
-            PinesMapa.Add(new Pin { Label = AppResources.PassengerDash_HomeLabel, Type = PinType.SavedPin, Location = new Location(LatCasa.Value, LngCasa.Value) });
-        }
-
-        if (mostrarAlterno)
-        {
-            if (HayVariasParadasOficiales)
-            {
-                foreach (var parada in ParadasOficiales)
-                {
-                    if (parada.Latitud == null || parada.Longitud == null) continue;
-                    bool esLaElegida = ModoAlterno == "MetaOficial" && LatAlterno == parada.Latitud && LngAlterno == parada.Longitud;
-                    PinesMapa.Add(new Pin { Label = esLaElegida ? $"✅ {parada.NombreLugar}" : $"🏁 {parada.NombreLugar}", Type = PinType.Place, Location = new Location(parada.Latitud.Value, parada.Longitud.Value) });
-                }
-            }
-            else if (LatAlterno.HasValue && LngAlterno.HasValue)
-            {
-                PinesMapa.Add(new Pin { Label = TextoAlterno, Type = PinType.Place, Location = new Location(LatAlterno.Value, LngAlterno.Value) });
-            }
-        }
+        var primero = EditandoCasa ? casa : u;
+        var segundo = EditandoCasa ? u : casa;
+        if (primero != null) PinesMapa.Add(primero);
+        if (segundo != null) PinesMapa.Add(segundo);
     }
+
+    // ───────────────────────── Confirmar ─────────────────────────
 
     [RelayCommand]
     public async Task ConfirmarAsync()
     {
-        if (Shell.Current == null) return;
+        if (Shell.Current == null || IsSaving) return;
 
+        if (_selecciones.Count == 0)
+        {
+            await Shell.Current.DisplayAlert(AppResources.Global_Attention, AppResources.Confirm_NoTripsChosen, AppResources.Global_Ok);
+            return;
+        }
         if (LatCasa == null || LngCasa == null)
         {
-            await Shell.Current.DisplayAlert(AppResources.Global_Attention, AppResources.PassengerDash_NeedHomeFirst, AppResources.Global_Ok);
+            EditandoCasa = true;
+            await Shell.Current.DisplayAlert(AppResources.Global_Attention, AppResources.Confirm_MarkAddress, AppResources.Global_Ok);
+            return;
+        }
+        if (EsReferenciaVaga(AliasUbicacionPersonal))
+        {
+            EditandoCasa = true;
+            await Shell.Current.DisplayAlert(AppResources.Confirm_WriteAddressTitle,
+                AppResources.Confirm_WriteAddressMsg,
+                AppResources.Global_Ok);
             return;
         }
         if (LatAlterno == null || LngAlterno == null)
         {
-            await Shell.Current.DisplayAlert(AppResources.Global_Attention, EsIda ? AppResources.Map_TouchDestination : AppResources.Map_TouchOrigin, AppResources.Global_Ok);
+            EditandoCasa = false;
+            await Shell.Current.DisplayAlert(AppResources.Global_Attention, AppResources.Confirm_ChooseAltPoint, AppResources.Global_Ok);
+            return;
+        }
+        if (UsandoRangoPersonalizado && FechaHastaPersonalizada.Date < DateTime.Today)
+        {
+            await Shell.Current.DisplayAlert(AppResources.Global_Attention, AppResources.Confirm_RepeatDatePassed, AppResources.Global_Ok);
             return;
         }
         if (Connectivity.Current.NetworkAccess != NetworkAccess.Internet)
@@ -381,102 +532,158 @@ public partial class ConfirmarReservaViewModel : ObservableObject
             return;
         }
 
-        IsSaving = true;
-
-        string currentUserId = "";
-        var authUser = _supabaseService.GetCurrentUser();
-        if (authUser != null && !string.IsNullOrEmpty(authUser.Id)) currentUserId = authUser.Id;
-        else { var sesionLocal = await GetLocalDb().ObtenerSesionActivaAsync(); if (sesionLocal != null) currentUserId = sesionLocal.Id; }
-
-        if (string.IsNullOrEmpty(currentUserId))
+        var yo = _supabaseService.GetCurrentUser();
+        if (yo == null || string.IsNullOrEmpty(yo.Id))
         {
-            IsSaving = false;
             await Shell.Current.DisplayAlert(AppResources.Global_Error, AppResources.PassengerDash_SessionExpired, AppResources.Global_Ok);
             return;
         }
 
-        if (CasaEsNueva)
-        {
-            var casa = new UbicacionPasajero { Id = Guid.NewGuid().ToString(), IdPasajero = currentUserId, Alias = AppResources.PassengerDash_HomeLabel, DireccionTexto = AppResources.PassengerDash_HomeLabel, Latitud = LatCasa, Longitud = LngCasa };
-            await _supabaseService.CreateUbicacionAsync(casa);
-        }
-
-        //  FIX: antes, si el usuario dejaba la casilla marcada pero no escribía
-        // un alias, el guardado se saltaba EN SILENCIO — por eso parecía que el
-        // historial "nunca guardaba nada". Ahora, si no hay alias, se usa la
-        // dirección geocodificada como nombre por defecto (siempre que la casilla
-        // esté marcada).
-        if (ModoAlterno == "Mapa" && GuardarNuevoAlternoEnHistorial)
-        {
-            string aliasFinal = !string.IsNullOrWhiteSpace(NuevoAliasAlterno) ? NuevoAliasAlterno.Trim() : TextoAlterno;
-            var nuevaUb = new UbicacionPasajero { Id = Guid.NewGuid().ToString(), IdPasajero = currentUserId, Alias = aliasFinal, DireccionTexto = TextoAlterno, Latitud = LatAlterno, Longitud = LngAlterno };
-            await _supabaseService.CreateUbicacionAsync(nuevaUb);
-        }
-
-        var asignacionesAReservar = new List<OpcionViajePasajero>();
-        var idsYaAgregados = new HashSet<string>();
-
-        foreach (var opcionBase in _seleccionesIniciales)
-        {
-            if (idsYaAgregados.Add(opcionBase.IdAsignacion)) asignacionesAReservar.Add(opcionBase);
-
-            if (AlcanceSeleccionado == AppResources.PassengerDash_ScopeOnlyThisDay) continue;
-
-            var fechaBase = opcionBase.FechaAsignacion.Date;
-            DateTime fechaLimite = AlcanceSeleccionado switch
-            {
-                _ when AlcanceSeleccionado == AppResources.PassengerDash_ScopeThisWeek => fechaBase.AddDays(7 - (int)fechaBase.DayOfWeek),
-                _ when AlcanceSeleccionado == AppResources.PassengerDash_ScopeThisMonth => fechaBase.AddDays(30),
-                _ when AlcanceSeleccionado == AppResources.PassengerDash_ScopeRestOfCycle => fechaBase.AddMonths(6),
-                _ when AlcanceSeleccionado == AppResources.PassengerDash_ScopeCustomRange => FechaHastaPersonalizada,
-                _ => fechaBase
-            };
-            //  Nunca reservar más allá del fin real del ciclo del viaje, sin importar
-            // qué botón se haya elegido — evita "reservar" fechas donde ese viaje ya no existe.
-            if (fechaLimite > FechaMaximaRango) fechaLimite = FechaMaximaRango;
-
-            var asignacionesFuturas = await _supabaseService.GetAsignacionesPorRangoAsync(fechaBase.AddDays(1), fechaLimite, new List<string> { opcionBase.IdChofer });
-            foreach (var a in asignacionesFuturas.Where(a => a.IdViaje == opcionBase.IdViajeBase))
-            {
-                if (!idsYaAgregados.Add(a.Id)) continue;
-                asignacionesAReservar.Add(new OpcionViajePasajero { IdAsignacion = a.Id, IdViajeBase = a.IdViaje, IdChofer = a.IdChofer, FechaAsignacion = a.Fecha.ToLocalTime(), EsIda = opcionBase.EsIda });
-            }
-        }
-
-        int exitosas = 0;
-        foreach (var asig in asignacionesAReservar)
-        {
-            var reserva = new Reserva { Id = Guid.NewGuid().ToString(), IdAsignacion = asig.IdAsignacion, IdPasajero = currentUserId, Estado = "pendiente", CreadoEn = DateTime.UtcNow };
-
-            if (asig.EsIda)
-            {
-                reserva.PuntoRecogidaTexto = AppResources.PassengerDash_HomeLabel;
-                reserva.LatitudRecogida = LatCasa; reserva.LongitudRecogida = LngCasa;
-                reserva.PuntoBajadaTexto = TextoAlterno;
-                reserva.LatitudBajada = LatAlterno; reserva.LongitudBajada = LngAlterno;
-            }
-            else
-            {
-                reserva.PuntoRecogidaTexto = TextoAlterno;
-                reserva.LatitudRecogida = LatAlterno; reserva.LongitudRecogida = LngAlterno;
-                reserva.PuntoBajadaTexto = AppResources.PassengerDash_HomeLabel;
-                reserva.LatitudBajada = LatCasa; reserva.LongitudBajada = LngCasa;
-            }
-
-            if (await _supabaseService.CreateReservaAsync(reserva)) exitosas++;
-        }
-
+        IsSaving = true;
+        var resultado = await Task.Run(() => ReservarAsync(yo.Id));
         IsSaving = false;
 
-        if (exitosas > 0)
+        if (resultado.Creadas > 0)
         {
-            string msg = asignacionesAReservar.Count == 1 ? AppResources.PassengerDash_BookingSuccess : string.Format(AppResources.PassengerDash_BulkBookingSuccess, exitosas, asignacionesAReservar.Count);
-            await Shell.Current.DisplayAlert(AppResources.Global_Attention, msg, AppResources.Global_Ok);
+            string msg = resultado.Creadas == 1 ? AppResources.Confirm_BookedOne : AppResources.F(AppResources.Confirm_BookedMany, resultado.Creadas);
+            if (resultado.YaTenias > 0) msg += "\n" + AppResources.F(AppResources.Confirm_AlreadyHadSome, resultado.YaTenias);
+            if (!string.IsNullOrEmpty(resultado.Aviso)) msg += $"\n\n⚠️ {resultado.Aviso}";
+            await Shell.Current.DisplayAlert(AppResources.Confirm_BookingConfirmedTitle, msg, AppResources.Global_Ok);
+            await Shell.Current.Navigation.PopAsync();
+        }
+        else if (resultado.YaTenias > 0 && string.IsNullOrEmpty(resultado.Error))
+        {
+            await Shell.Current.DisplayAlert(AppResources.Global_Attention, AppResources.Confirm_AlreadyHadAll, AppResources.Global_Ok);
             await Shell.Current.Navigation.PopAsync();
         }
         else
         {
-            await Shell.Current.DisplayAlert(AppResources.Global_Error, AppResources.PassengerDash_BookingError, AppResources.Global_Ok);
+            await Shell.Current.DisplayAlert(AppResources.Global_Error,
+                string.IsNullOrEmpty(resultado.Error) ? AppResources.PassengerDash_BookingError : AppResources.F(AppResources.Confirm_CouldNotBook, resultado.Error),
+                AppResources.Global_Ok);
+        }
+    }
+
+    private async Task<(int Creadas, int YaTenias, string Aviso, string Error)> ReservarAsync(string miId)
+    {
+        try
+        {
+            var client = _supabaseService.Client;
+            if (client == null) return (0, 0, "", AppResources.Global_NoServerConnection);
+
+            string referenciaCasa = AliasUbicacionPersonal.Trim();
+            string aviso = "";
+
+            // 1) Guardar lugares nuevos en "mis lugares" (si la tabla no existe, la reserva sigue igual)
+            if (CasaEsNueva || !string.Equals(referenciaCasa, _nombreCasaOriginal, StringComparison.OrdinalIgnoreCase))
+                await _supabaseService.CreateUbicacionAsync(new UbicacionPasajero { Id = Guid.NewGuid().ToString(), IdPasajero = miId, Alias = referenciaCasa, DireccionTexto = referenciaCasa, Latitud = LatCasa, Longitud = LngCasa, Tipo = "casa" });
+            if (ModoAlterno == "Mapa" && GuardarNuevoAlternoEnHistorial)
+                await _supabaseService.CreateUbicacionAsync(new UbicacionPasajero { Id = Guid.NewGuid().ToString(), IdPasajero = miId, Alias = TextoAlterno, DireccionTexto = TextoAlterno, Latitud = LatAlterno, Longitud = LngAlterno, Tipo = "alterno" });
+
+            // 2) Hasta qué fecha se repite cada selección (mismo día de la semana, misma hora)
+            DateTime hoy = DateTime.Today;
+            DateTime limite =
+                AlcanceSeleccionado == AlcanceUnMes ? hoy.AddDays(30) :
+                AlcanceSeleccionado == AlcanceCiclo ? FechaMaximaRango :
+                AlcanceSeleccionado == AlcancePersonalizado ? FechaHastaPersonalizada.Date :
+                DateTime.MinValue;
+            if (limite > FechaMaximaRango) limite = FechaMaximaRango;
+
+            // 3) Todas las salidas de esos viajes en el rango (por VIAJE, no por chofer:
+            //    antes, si otro día manejaba otra persona, ese día se saltaba)
+            var idsViajes = _selecciones.Select(s => s.IdViajeBase).Distinct().ToList();
+            DateTime desde = _selecciones.Min(s => s.FechaAsignacion.Date);
+            DateTime hasta = limite > desde ? limite : _selecciones.Max(s => s.FechaAsignacion.Date);
+
+            var resp = await client.From<Asignacion>()
+                .Filter("id_viaje", Operador.In, idsViajes)
+                .Filter("fecha", Operador.GreaterThanOrEqual, desde.DesdeElSalvadorAUtc().ToString("o", CultureInfo.InvariantCulture))
+                .Filter("fecha", Operador.LessThan, hasta.AddDays(1).DesdeElSalvadorAUtc().ToString("o", CultureInfo.InvariantCulture))
+                .Get();
+            var salidas = resp.Models ?? new List<Asignacion>();
+
+            // 4) Lo que ya tengo reservado, para no duplicar
+            var misReservas = await _supabaseService.GetReservasPorPasajeroYRangoAsync(miId, desde, hasta);
+            var yaReservadas = new HashSet<string>(misReservas.Where(r => r.Estado != "cancelado").Select(r => r.IdAsignacion));
+
+            var objetivo = new List<(Asignacion Asig, bool EsIda)>();
+            var diasYaTomados = new HashSet<string>(); // viaje + día
+            int yaTenias = 0;
+            DateTime ahora = DateTime.Now;
+
+            foreach (var sel in _selecciones.OrderBy(s => s.FechaAsignacion))
+            {
+                // Fechas: la elegida y, si se repite, la misma cada 7 días
+                var fechas = new List<DateTime> { sel.FechaAsignacion.Date };
+                if (limite != DateTime.MinValue)
+                    for (var f = sel.FechaAsignacion.Date.AddDays(7); f <= limite; f = f.AddDays(7)) fechas.Add(f);
+
+                foreach (var dia in fechas)
+                {
+                    string clave = $"{sel.IdViajeBase}|{dia:yyyyMMdd}";
+                    if (!diasYaTomados.Add(clave)) continue;
+
+                    var delDia = salidas.Where(a => a.IdViaje == sel.IdViajeBase && a.Fecha.AHoraElSalvador().Date == dia).ToList();
+                    if (dia == sel.FechaAsignacion.Date && delDia.All(a => a.Id != sel.IdAsignacion))
+                    {
+                        // La elegida siempre cuenta, aunque la consulta no la haya traído
+                        delDia.Insert(0, new Asignacion { Id = sel.IdAsignacion, IdViaje = sel.IdViajeBase, IdChofer = sel.IdChofer, Fecha = sel.FechaAsignacion });
+                    }
+                    if (delDia.Count == 0) continue; // ese día el viaje no sale
+
+                    if (delDia.Any(a => yaReservadas.Contains(a.Id))) { yaTenias++; continue; }
+
+                    var elegida = dia == sel.FechaAsignacion.Date
+                        ? delDia.First(a => a.Id == sel.IdAsignacion)
+                        : (delDia.FirstOrDefault(a => a.IdChofer == sel.IdChofer) ?? delDia.OrderBy(a => a.CreadoEn).First());
+
+                    if (elegida.Fecha.AHoraElSalvador() < ahora) continue; // ya pasó
+
+                    objetivo.Add((elegida, sel.EsIda));
+                }
+            }
+
+            if (objetivo.Count == 0) return (0, yaTenias, "", "");
+
+            // 5) Crear todas las reservas en lotes (antes: una llamada por viaje)
+            var reservas = objetivo.Select(o =>
+            {
+                var r = new Reserva { Id = Guid.NewGuid().ToString(), IdAsignacion = o.Asig.Id, IdPasajero = miId, Estado = "pendiente", CreadoEn = DateTime.UtcNow };
+                if (o.EsIda)
+                {
+                    r.PuntoRecogidaTexto = referenciaCasa; r.LatitudRecogida = LatCasa; r.LongitudRecogida = LngCasa;
+                    r.PuntoBajadaTexto = TextoAlterno; r.LatitudBajada = LatAlterno; r.LongitudBajada = LngAlterno;
+                }
+                else
+                {
+                    r.PuntoRecogidaTexto = TextoAlterno; r.LatitudRecogida = LatAlterno; r.LongitudRecogida = LngAlterno;
+                    r.PuntoBajadaTexto = referenciaCasa; r.LatitudBajada = LatCasa; r.LongitudBajada = LngCasa;
+                }
+                return r;
+            }).ToList();
+
+            int creadas = 0;
+            for (int i = 0; i < reservas.Count; i += 50)
+            {
+                var lote = reservas.Skip(i).Take(50).ToList();
+                try
+                {
+                    await client.From<Reserva>().Insert(lote);
+                    creadas += lote.Count;
+                }
+                catch (Exception ex)
+                {
+                    CrashLogger.Guardar(ex, "ConfirmarReservaViewModel.ReservarAsync.Insert");
+                    aviso = AppResources.Confirm_SomeNotBooked;
+                }
+            }
+
+            return (creadas, yaTenias, aviso, creadas == 0 ? AppResources.Confirm_ServerRejected : "");
+        }
+        catch (Exception ex)
+        {
+            CrashLogger.Guardar(ex, "ConfirmarReservaViewModel.ReservarAsync");
+            return (0, 0, "", ex.Message);
         }
     }
 }

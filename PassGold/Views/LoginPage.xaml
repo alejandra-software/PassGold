@@ -11,7 +11,7 @@
             <VerticalStackLayout Padding="24,48,24,24" Spacing="16">
 
                 <VerticalStackLayout Spacing="8" HorizontalOptions="Center" Margin="0,20,0,36">
-                    <Label Text="🔑" FontSize="56" HorizontalOptions="Center"/>
+                    <Image Source="logointerno.png" WidthRequest="150" HeightRequest="150" HorizontalOptions="Center"/>
                     <Label Text="{helpers:Translate AppTitle}" FontSize="28" FontAttributes="Bold" HorizontalOptions="Center"/>
                     <Label Text="{helpers:Translate AppSubtitle}" FontSize="14"
                            TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"
@@ -53,7 +53,7 @@
 
                 <!-- NUEVO: Redes Sociales -->
                 <VerticalStackLayout Spacing="10" Margin="0,15,0,0">
-                    <Label Text="O ingresa rápidamente con" HorizontalOptions="Center" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                    <Label Text="{helpers:Translate Login_QuickWith}" HorizontalOptions="Center" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
                         <Button Grid.Column="0" Text="Google" Command="{Binding LoginWithGoogleCommand}" BackgroundColor="#DB4437" TextColor="White" CornerRadius="8" FontAttributes="Bold" IsEnabled="{Binding IsLoginLoading, Converter={StaticResource InvertedBoolConverter}}"/>
                         <Button Grid.Column="1" Text="Apple" Command="{Binding LoginWithAppleCommand}" BackgroundColor="Black" TextColor="White" CornerRadius="8" FontAttributes="Bold" IsEnabled="{Binding IsLoginLoading, Converter={StaticResource InvertedBoolConverter}}"/>

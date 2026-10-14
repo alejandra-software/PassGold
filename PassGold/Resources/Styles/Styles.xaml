@@ -2,6 +2,26 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
+    <!-- 1. Definición de colores base requeridos por los StaticResource -->
+    <!-- Se añade un tono dorado/ámbar como Primary, ideal para una interfaz de transporte -->
+    <Color x:Key="Primary">#FFC107</Color>
+
+    <Color x:Key="LightBg">#FFFFFF</Color>
+    <Color x:Key="DarkBg">#121212</Color>
+
+    <Color x:Key="LightText">#212121</Color>
+    <Color x:Key="DarkText">#F5F5F5</Color>
+
+    <Color x:Key="LightHint">#9E9E9E</Color>
+    <Color x:Key="DarkHint">#757575</Color>
+
+    <Color x:Key="LightDivider">#EEEEEE</Color>
+    <Color x:Key="DarkDivider">#333333</Color>
+
+    <Color x:Key="LightButtonSec">#E0E0E0</Color>
+    <Color x:Key="DarkButtonSec">#424242</Color>
+
+    <!-- 2. Estilos implícitos -->
     <Style TargetType="ContentPage" ApplyToDerivedTypes="True">
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}" />
     </Style>
@@ -44,7 +64,5 @@
             </Trigger>
         </Style.Triggers>
     </Style>
-
-   
 
 </ResourceDictionary>

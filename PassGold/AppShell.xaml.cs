@@ -28,13 +28,16 @@ public partial class AppShell : Shell
         Routing.RegisterRoute("fleet-profile", typeof(FleetProfilePage));
         Routing.RegisterRoute("fleet-schedule", typeof(FleetSchedulePage));
         Routing.RegisterRoute("pasajero-reserva", typeof(PasajeroReservaPage));
-        // A�ade esta l�nea junto a las dem�s en el constructor:
         Routing.RegisterRoute("fleet-directory", typeof(FleetDirectoryPage));
+        Routing.RegisterRoute("mapa-pasajero", typeof(Views.MapaRastreoPage));
+
+        // --- Nuevas rutas añadidas (Mayúsculas corregidas) ---
+        Routing.RegisterRoute("pasajero-detalle", typeof(PasajeroDetallePage));
+        Routing.RegisterRoute("set-home-location", typeof(SetHomeLocationPage));
     }
 
     private async void MenuNavegar_Clicked(object sender, EventArgs e)
     {
-        // ?? SOLUCI�N AL ERROR CS0104: Especificamos la ruta exacta del bot�n de MAUI
         if (sender is Microsoft.Maui.Controls.Button btn && btn.CommandParameter is string ruta)
         {
             Current.FlyoutIsPresented = false;

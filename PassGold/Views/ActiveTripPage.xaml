@@ -13,6 +13,7 @@
 
     <Grid RowDefinitions="4*, 6*">
 
+        <!-- MAPA SUPERIOR (PLACEHOLDER) -->
         <Border Grid.Row="0" BackgroundColor="{AppThemeBinding Light=#E0E0E0, Dark=#2A2A2A}" StrokeThickness="0">
             <Grid>
                 <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="10">
@@ -45,6 +46,7 @@
             </Grid>
         </Border>
 
+        <!-- PANEL INFERIOR (LISTA Y BOTONES) -->
         <Border Grid.Row="1" StrokeShape="RoundRectangle 25,25,0,0" BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#121212}" StrokeThickness="0" Margin="0,-25,0,0">
             <Grid RowDefinitions="Auto, *, Auto">
 
@@ -61,6 +63,7 @@
                     </Grid>
                 </VerticalStackLayout>
 
+                <!-- LISTA DE ESTUDIANTES -->
                 <ScrollView Grid.Row="1" Padding="20,5">
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding PasajerosDelViaje}" Spacing="12">
                         <BindableLayout.ItemTemplate>
@@ -101,7 +104,30 @@
                     </VerticalStackLayout>
                 </ScrollView>
 
-                <Button Grid.Row="2" Text="{helpers:Translate ActiveTrip_FinishBtn}" Command="{Binding FinalizarViajeCommand}" Margin="20,10,20,20" HeightRequest="50" CornerRadius="10" FontAttributes="Bold" BackgroundColor="{AppThemeBinding Light=#333333, Dark=#E0E0E0}" TextColor="{AppThemeBinding Light=#FFFFFF, Dark=#000000}"/>
+                <!-- BOTONES DE CONTROL DE VIAJE -->
+                <VerticalStackLayout Grid.Row="2" Margin="20,10,20,20" Spacing="8">
+                    <!-- Estado del envío de ubicación (✅ enviada a las… / ❌ no se pudo…) -->
+                    <Label Text="{Binding EstadoRastreo}"
+                       IsVisible="{Binding IsViajeEnCurso}"
+                       HorizontalTextAlignment="Center" FontSize="13"
+                       TextColor="{AppThemeBinding Light=#555555, Dark=#BBBBBB}"/>
+                    <Grid>
+                        <!-- Botón para Iniciar (enciende GPS) -->
+                        <Button Text="{helpers:Translate ActiveTrip_StartBtn}" 
+                            Command="{Binding IniciarViajeCommand}" 
+                            IsVisible="{Binding IsViajeEnCurso, Converter={StaticResource InvertedBoolConverter}}"
+                            HeightRequest="50" CornerRadius="10" FontAttributes="Bold" 
+                            BackgroundColor="{StaticResource Primary}" TextColor="White"/>
+
+                        <!-- Botón para Finalizar (apaga GPS) -->
+                        <Button Text="{helpers:Translate ActiveTrip_FinishBtn}" 
+                            Command="{Binding FinalizarViajeCommand}" 
+                            IsVisible="{Binding IsViajeEnCurso}"
+                            HeightRequest="50" CornerRadius="10" FontAttributes="Bold" 
+                            BackgroundColor="{AppThemeBinding Light=#333333, Dark=#E0E0E0}" 
+                            TextColor="{AppThemeBinding Light=#FFFFFF, Dark=#000000}"/>
+                    </Grid>
+                </VerticalStackLayout>
 
             </Grid>
         </Border>

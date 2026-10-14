@@ -3,9 +3,18 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
     <Color x:Key="Primary">#D4AF37</Color>
-    
+
     <Color x:Key="PrimaryDark">#B8972E</Color>
     <Color x:Key="SecondaryBlue">#1E90FF</Color>
+    <!-- 🔧 FIX: esta clave se llamaba "Secondary" antes de que alguien la renombrara
+         a "SecondaryBlue" — pero varias pantallas (ScheduleTripPage, EditTripPage, y
+         posiblemente otras que todavía no se probaron) seguían pidiendo
+         "{StaticResource Secondary}". Esa referencia rota es justo lo que hacía
+         explotar la pantalla ANTES de que llegara a abrirse (XamlParseException).
+         Se deja este alias apuntando al mismo color, así no hay que cazar y
+         reemplazar cada uso suelto por el proyecto, y cualquier pantalla que todavía
+         no se probó y también use "Secondary" queda arreglada de una vez. -->
+    <Color x:Key="Secondary">#1E90FF</Color>
     <Color x:Key="Error">#E53935</Color>
 
     <Color x:Key="LightBg">#FFFFFF</Color>

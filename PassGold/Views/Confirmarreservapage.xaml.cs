@@ -14,10 +14,10 @@ public partial class ConfirmarReservaPage : ContentPage
 {
     private static readonly Location UbicacionDefault = new(13.9946, -89.5597);
 
-    public ConfirmarReservaPage(List<OpcionViajePasajero> selecciones)
+    public ConfirmarReservaPage(List<PassGold.Models.OpcionViajePasajero> selecciones)
     {
         InitializeComponent();
-        var vm = new ConfirmarReservaViewModel(selecciones);
+        var vm = new PassGold.ViewModels.ConfirmarReservaViewModel(selecciones);
         BindingContext = vm;
 
         MapaConfirmar.MoveToRegion(MapSpan.FromCenterAndRadius(UbicacionDefault, Distance.FromKilometers(2)));
@@ -43,10 +43,8 @@ public partial class ConfirmarReservaPage : ContentPage
         }
     }
 
-    //  Buscador restaurado — se me había olvidado al armar esta pantalla nueva.
-    // Igual que en PasajeroReservaPage: solo mueve/acerca el mapa a la dirección
-    // buscada, el usuario todavía tiene que tocar el punto exacto para fijar el pin
-    // (casa o alterno, según cuál esté activo).
+    // Solo mueve/acerca el mapa a la dirección buscada; el usuario todavía tiene que
+    // tocar el punto exacto para fijar el pin (casa o alterno, según cuál esté activo).
     private async void BuscadorConfirmar_SearchButtonPressed(object sender, System.EventArgs e)
     {
         var query = BuscadorConfirmar.Text;
@@ -72,32 +70,7 @@ public partial class ConfirmarReservaPage : ContentPage
         }
     }
 
-    private async Task<Location?> BuscarConReintentoAsync(string query)
-    {
-        string busquedaExacta = $"{query}, El Salvador";
-        var ubicaciones = await Geocoding.Default.GetLocationsAsync(busquedaExacta);
-        var encontrada = ubicaciones?.FirstOrDefault();
-        if (encontrada != null) return encontrada;
-
-        string sinTildes = QuitarTildes(query);
-        if (sinTildes != query)
-        {
-            var ubicaciones2 = await Geocoding.Default.GetLocationsAsync($"{sinTildes}, El Salvador");
-            encontrada = ubicaciones2?.FirstOrDefault();
-        }
-        return encontrada;
-    }
-
-    private static string QuitarTildes(string texto)
-    {
-        var normalizado = texto.Normalize(System.Text.NormalizationForm.FormD);
-        var sb = new System.Text.StringBuilder();
-        foreach (var c in normalizado)
-        {
-            var categoria = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c);
-            if (categoria != System.Globalization.UnicodeCategory.NonSpacingMark)
-                sb.Append(c);
-        }
-        return sb.ToString().Normalize(System.Text.NormalizationForm.FormC);
-    }
+    // Buscador compartido (Apple Maps en iPhone + filtros para El Salvador)
+    private Task<Location?> BuscarConReintentoAsync(string query)
+        => PassGold.Helpers.BuscadorLugares.BuscarAsync(query, MapaConfirmar.VisibleRegion?.Center);
 }

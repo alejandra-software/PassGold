@@ -1,3 +1,5 @@
+// Evita el choque con Android.App.Application al compilar para Android
+using Application = Microsoft.Maui.Controls.Application;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PassGold.Models;
@@ -11,6 +13,7 @@ using Newtonsoft.Json;
 using Microsoft.Maui.Networking;
 using System.Collections.Generic;
 using PassGold.Models.Local;
+using Microsoft.Maui.ApplicationModel;
 
 namespace PassGold.ViewModels;
 
@@ -19,7 +22,7 @@ public class AdminCachePayload
     public bool IsBoss { get; set; }
     public bool IsFleetManager { get; set; }
     public bool IsEmployee { get; set; }
-    public string FleetCode { get; set; } = "Cargando...";
+    public string FleetCode { get; set; } = AppResources.Global_Loading;
     public string BossName { get; set; } = "";
     public bool HasJoinedFleet { get; set; }
     public List<Vehiculo> Microbuses { get; set; } = new();
@@ -30,6 +33,45 @@ public class AdminCachePayload
     public string RutasFlota { get; set; } = "";
 }
 
+// 🆕 Un empleado en la lista "Mis choferes", con su interruptor de sub-jefe.
+public partial class EmpleadoFlotaItem : ObservableObject
+{
+    public Usuario Usuario { get; }
+    public string Id => Usuario.Id;
+    public string Nombre => Usuario.Nombre;
+    public string Email => Usuario.Email;
+    public string? FotoPerfil => Usuario.FotoPerfil;
+
+    [ObservableProperty] private bool puedeGestionar;
+
+    // La pantalla avisa al ViewModel cuando el jefe mueve el interruptor
+    internal System.Func<EmpleadoFlotaItem, bool, Task>? AlCambiarPermiso;
+    private bool _silencio;
+
+    public EmpleadoFlotaItem(Usuario u)
+    {
+        Usuario = u;
+        _silencio = true;
+        PuedeGestionar = u.PuedeGestionarViajes;
+        _silencio = false;
+    }
+
+    // Para regresar el interruptor sin volver a llamar a Supabase (si falló)
+    internal void PonerSinAvisar(bool valor)
+    {
+        _silencio = true;
+        PuedeGestionar = valor;
+        _silencio = false;
+    }
+
+    partial void OnPuedeGestionarChanged(bool value)
+    {
+        if (_silencio) return;
+        Usuario.PuedeGestionarViajes = value;
+        if (AlCambiarPermiso != null) _ = AlCambiarPermiso(this, value);
+    }
+}
+
 public partial class AdminFleetViewModel : ObservableObject
 {
     private readonly SupabaseService _supabaseService = SupabaseService.Instance;
@@ -38,13 +80,13 @@ public partial class AdminFleetViewModel : ObservableObject
         Application.Current?.Handler?.MauiContext?.Services.GetService<LocalDatabaseService>() ?? new LocalDatabaseService();
 
     public ObservableCollection<Vehiculo> MisMicrobuses { get; } = new();
-    public ObservableCollection<Usuario> MisChoferes { get; } = new();
+    public ObservableCollection<EmpleadoFlotaItem> MisChoferes { get; } = new();
 
     [ObservableProperty] private bool isLoading = false;
     [ObservableProperty] private bool hasNoEmployees = false;
     [ObservableProperty] private bool isFleetManager = false;
     [ObservableProperty] private bool isBoss = false;
-    [ObservableProperty] private string fleetCode = "Cargando...";
+    [ObservableProperty] private string fleetCode = AppResources.Global_Loading;
 
     [ObservableProperty] private bool isEmployee = false;
     [ObservableProperty] private string joinCodeInput = "";
@@ -52,7 +94,6 @@ public partial class AdminFleetViewModel : ObservableObject
     [ObservableProperty] private string bossName = "";
     [ObservableProperty] private bool hasJoinedFleet = false;
 
-    //  NUEVO: Logistica de la flota (movido aqui desde Settings, solo lo administra jefe/independiente)
     [ObservableProperty] private string nombreFlotaInput = "";
     [ObservableProperty] private string telefonoInput = "";
     [ObservableProperty] private string descripcionInput = "";
@@ -65,13 +106,15 @@ public partial class AdminFleetViewModel : ObservableObject
     [RelayCommand]
     public async Task LoadFleetDataAsync()
     {
-        IsLoading = true;
-        JoinErrorMessage = string.Empty;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            IsLoading = true;
+            JoinErrorMessage = string.Empty;
+        });
 
         var localDb = GetLocalDb();
         string currentUserId = "";
 
-        //  LA CURA DE LA AMNESIA PARA EL ADMIN
         var authUser = _supabaseService.GetCurrentUser();
         if (authUser != null && !string.IsNullOrEmpty(authUser.Id))
         {
@@ -85,7 +128,7 @@ public partial class AdminFleetViewModel : ObservableObject
 
         if (string.IsNullOrEmpty(currentUserId))
         {
-            IsLoading = false;
+            MainThread.BeginInvokeOnMainThread(() => IsLoading = false);
             return;
         }
         _currentUserId = currentUserId;
@@ -96,18 +139,16 @@ public partial class AdminFleetViewModel : ObservableObject
         {
             await Task.Delay(100);
 
-            // 1. LECTURA INSTANTÁNEA OFFLINE
             string? cacheJson = await localDb.LeerCacheAsync(cacheKey);
             if (!string.IsNullOrEmpty(cacheJson))
             {
                 var payload = JsonConvert.DeserializeObject<AdminCachePayload>(cacheJson);
                 if (payload != null)
                 {
-                    PintarDatosEnPantalla(payload);
+                    MainThread.BeginInvokeOnMainThread(() => PintarDatosEnPantalla(payload));
                 }
             }
 
-            // 2. SINCRONIZACIÓN FANTASMA
             if (Connectivity.Current.NetworkAccess == NetworkAccess.Internet)
             {
                 _ = Task.Run(async () =>
@@ -137,7 +178,7 @@ public partial class AdminFleetViewModel : ObservableObject
                             if (nuevoPayload.IsBoss)
                             {
                                 var codigo = await _supabaseService.GetOrCreateFleetCodeAsync(currentUserId);
-                                nuevoPayload.FleetCode = string.IsNullOrWhiteSpace(codigo) ? "ERR-CÓD" : codigo;
+                                nuevoPayload.FleetCode = string.IsNullOrWhiteSpace(codigo) ? AppResources.AdminFleet_CodeError : codigo;
                                 nuevoPayload.Choferes = await _supabaseService.GetEmployeesByBossAsync(currentUserId);
                             }
                         }
@@ -150,7 +191,7 @@ public partial class AdminFleetViewModel : ObservableObject
 
                         await localDb.GuardarCacheAsync(cacheKey, JsonConvert.SerializeObject(nuevoPayload));
 
-                        Application.Current?.Dispatcher.Dispatch(() =>
+                        MainThread.BeginInvokeOnMainThread(() =>
                         {
                             PintarDatosEnPantalla(nuevoPayload);
                         });
@@ -162,7 +203,7 @@ public partial class AdminFleetViewModel : ObservableObject
         catch { }
         finally
         {
-            IsLoading = false;
+            MainThread.BeginInvokeOnMainThread(() => IsLoading = false);
         }
     }
 
@@ -179,7 +220,8 @@ public partial class AdminFleetViewModel : ObservableObject
         foreach (var v in payload.Microbuses) MisMicrobuses.Add(v);
 
         MisChoferes.Clear();
-        foreach (var e in payload.Choferes) MisChoferes.Add(e);
+        foreach (var e in payload.Choferes)
+            MisChoferes.Add(new EmpleadoFlotaItem(e) { AlCambiarPermiso = CambiarPermisoAsync });
 
         HasNoEmployees = MisChoferes.Count == 0;
 
@@ -216,7 +258,8 @@ public partial class AdminFleetViewModel : ObservableObject
     public async Task SaveLogisticsAsync()
     {
         if (Shell.Current == null) return;
-        IsLoading = true;
+
+        MainThread.BeginInvokeOnMainThread(() => IsLoading = true);
 
         try
         {
@@ -225,7 +268,10 @@ public partial class AdminFleetViewModel : ObservableObject
 
             if (_currentUserData == null)
             {
-                await Shell.Current.DisplayAlert(AppResources.Global_Error, AppResources.SettingsSessionError, AppResources.Global_Ok);
+                MainThread.BeginInvokeOnMainThread(async () => {
+                    IsLoading = false;
+                    await Shell.Current.DisplayAlert(AppResources.Global_Error, AppResources.SettingsSessionError, AppResources.Global_Ok);
+                });
                 return;
             }
 
@@ -235,18 +281,20 @@ public partial class AdminFleetViewModel : ObservableObject
             _currentUserData.RutasFlota = string.Join(", ", RutasTags);
 
             await _supabaseService.UpdateUserDataAsync(_currentUserData);
-            await Shell.Current.DisplayAlert(AppResources.SettingsUpdatedTitle, AppResources.SettingsUpdatedMsg, AppResources.Global_Ok);
+
+            MainThread.BeginInvokeOnMainThread(async () => {
+                IsLoading = false;
+                await Shell.Current.DisplayAlert(AppResources.SettingsUpdatedTitle, AppResources.SettingsUpdatedMsg, AppResources.Global_Ok);
+            });
         }
         catch (System.Exception)
         {
-            await Shell.Current.DisplayAlert(AppResources.Global_Error, AppResources.SettingsSaveError, AppResources.Global_Ok);
+            MainThread.BeginInvokeOnMainThread(async () => {
+                IsLoading = false;
+                await Shell.Current.DisplayAlert(AppResources.Global_Error, AppResources.SettingsSaveError, AppResources.Global_Ok);
+            });
         }
-        IsLoading = false;
     }
-
-    // =========================================================================
-    // RESTO DE LOS COMANDOS (BOTONES) INTACTOS
-    // =========================================================================
 
     [RelayCommand]
     public async Task CopyCodeAsync()
@@ -262,13 +310,14 @@ public partial class AdminFleetViewModel : ObservableObject
         if (Shell.Current == null) return;
 
         bool confirmar = await Shell.Current.DisplayAlert(
-            "Regenerar Código",
-            "¿Estás seguro de que deseas cambiar tu código de flota? El código anterior dejará de funcionar para nuevos empleados.",
-            "Sí, cambiar", "Cancelar");
+            AppResources.AdminFleet_RegenerateTitle,
+            AppResources.AdminFleet_RegenerateConfirm,
+            AppResources.AdminFleet_YesChange, AppResources.Global_Cancel);
 
         if (!confirmar) return;
 
-        IsLoading = true;
+        MainThread.BeginInvokeOnMainThread(() => IsLoading = true);
+
         var localDb = GetLocalDb();
         var sesionLocal = await localDb.ObtenerSesionActivaAsync();
         string currentUserId = _supabaseService.GetCurrentUser()?.Id ?? sesionLocal?.Id ?? "";
@@ -277,17 +326,23 @@ public partial class AdminFleetViewModel : ObservableObject
         {
             var nuevoCodigo = await _supabaseService.RegenerateFleetCodeAsync(currentUserId);
 
-            if (!string.IsNullOrEmpty(nuevoCodigo))
-            {
-                FleetCode = nuevoCodigo;
-                await Shell.Current.DisplayAlert("Éxito", "Tu código de flota ha sido actualizado.", "OK");
-            }
-            else
-            {
-                await Shell.Current.DisplayAlert("Error", "No se pudo regenerar el código.", "OK");
-            }
+            MainThread.BeginInvokeOnMainThread(async () => {
+                IsLoading = false;
+                if (!string.IsNullOrEmpty(nuevoCodigo))
+                {
+                    FleetCode = nuevoCodigo;
+                    await Shell.Current.DisplayAlert(AppResources.Global_Success, AppResources.AdminFleet_CodeUpdated, AppResources.Global_Ok);
+                }
+                else
+                {
+                    await Shell.Current.DisplayAlert(AppResources.Global_Error, AppResources.AdminFleet_RegenerateError, AppResources.Global_Ok);
+                }
+            });
         }
-        IsLoading = false;
+        else
+        {
+            MainThread.BeginInvokeOnMainThread(() => IsLoading = false);
+        }
     }
 
     [RelayCommand]
@@ -295,12 +350,14 @@ public partial class AdminFleetViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(JoinCodeInput))
         {
-            JoinErrorMessage = AppResources.Error_EmptyList;
+            MainThread.BeginInvokeOnMainThread(() => JoinErrorMessage = AppResources.Error_EmptyList);
             return;
         }
 
-        IsLoading = true;
-        JoinErrorMessage = string.Empty;
+        MainThread.BeginInvokeOnMainThread(() => {
+            IsLoading = true;
+            JoinErrorMessage = string.Empty;
+        });
 
         var localDb = GetLocalDb();
         var sesionLocal = await localDb.ObtenerSesionActivaAsync();
@@ -310,18 +367,26 @@ public partial class AdminFleetViewModel : ObservableObject
         {
             var (success, message) = await _supabaseService.JoinFleetByCodeAsync(JoinCodeInput, currentUserId);
 
-            if (success)
-            {
-                if (Shell.Current != null)
-                    await Shell.Current.DisplayAlert(AppResources.Global_Ok, message, AppResources.Global_Ok);
+            MainThread.BeginInvokeOnMainThread(async () => {
+                if (success)
+                {
+                    if (Shell.Current != null)
+                        await Shell.Current.DisplayAlert(AppResources.Global_Ok, message, AppResources.Global_Ok);
 
-                JoinCodeInput = string.Empty;
-                await LoadFleetDataAsync();
-            }
-            else JoinErrorMessage = message;
+                    JoinCodeInput = string.Empty;
+                    await LoadFleetDataAsync();
+                }
+                else
+                {
+                    JoinErrorMessage = message;
+                    IsLoading = false;
+                }
+            });
         }
-
-        IsLoading = false;
+        else
+        {
+            MainThread.BeginInvokeOnMainThread(() => IsLoading = false);
+        }
     }
 
     [RelayCommand]
@@ -338,39 +403,87 @@ public partial class AdminFleetViewModel : ObservableObject
 
         bool estaActivo = vehiculo.Estado == "activo";
         string pregunta = estaActivo
-            ? $"¿Desactivar el microbús {vehiculo.Placa}? Ya no aparecerá disponible para programar viajes nuevos, pero su historial se conserva."
-            : $"¿Reactivar el microbús {vehiculo.Placa}?";
+            ? AppResources.F(AppResources.AdminFleet_DeactivateBusConfirm, vehiculo.Placa)
+            : AppResources.F(AppResources.AdminFleet_ReactivateBusConfirm, vehiculo.Placa);
 
-        bool confirmar = await Shell.Current.DisplayAlert("Confirmar", pregunta, "Sí", "Cancelar");
+        bool confirmar = await Shell.Current.DisplayAlert(AppResources.Global_Confirm, pregunta, AppResources.Global_Yes, AppResources.Global_Cancel);
         if (!confirmar) return;
 
-        IsLoading = true;
+        MainThread.BeginInvokeOnMainThread(() => IsLoading = true);
+
         bool exito = estaActivo
             ? await _supabaseService.DeactivateVehiculoAsync(vehiculo.Id)
             : await _supabaseService.ReactivateVehiculoAsync(vehiculo.Id);
-        IsLoading = false;
 
-        if (exito) await LoadFleetDataAsync();
-        else await Shell.Current.DisplayAlert("Error", "No se pudo actualizar el microbús.", "OK");
+        MainThread.BeginInvokeOnMainThread(async () => {
+            IsLoading = false;
+            if (exito) await LoadFleetDataAsync();
+            else await Shell.Current.DisplayAlert(AppResources.Global_Error, AppResources.AdminFleet_BusUpdateError, AppResources.Global_Ok);
+        });
+    }
+
+    // 🆕 El jefe da o quita a un empleado el permiso de crear y editar viajes
+    private async Task CambiarPermisoAsync(EmpleadoFlotaItem item, bool permitir)
+    {
+        if (Shell.Current == null) return;
+
+        if (permitir)
+        {
+            bool confirmar = await Shell.Current.DisplayAlert(
+                AppResources.SubBoss_ConfirmTitle,
+                AppResources.F(AppResources.SubBoss_ConfirmMsg, item.Nombre),
+                AppResources.SubBoss_ConfirmYes, AppResources.Global_Cancel);
+            if (!confirmar) { item.PonerSinAvisar(false); return; }
+        }
+
+        bool ok = Connectivity.Current.NetworkAccess == NetworkAccess.Internet
+                  && await _supabaseService.FijarPermisoViajesAsync(item.Id, permitir);
+
+        if (!ok)
+        {
+            item.PonerSinAvisar(!permitir);
+            await Shell.Current.DisplayAlert(AppResources.Global_Error, AppResources.SubBoss_Error, AppResources.Global_Ok);
+            return;
+        }
+
+        // Que la caché de esta pantalla quede al día
+        try
+        {
+            var localDb = GetLocalDb();
+            string cacheKey = $"AdminFleetData_{_currentUserId}";
+            string? cacheJson = await localDb.LeerCacheAsync(cacheKey);
+            var payload = string.IsNullOrEmpty(cacheJson) ? null : JsonConvert.DeserializeObject<AdminCachePayload>(cacheJson);
+            var emp = payload?.Choferes.Find(c => c.Id == item.Id);
+            if (payload != null && emp != null)
+            {
+                emp.PuedeGestionarViajes = permitir;
+                await localDb.GuardarCacheAsync(cacheKey, JsonConvert.SerializeObject(payload));
+            }
+        }
+        catch { }
     }
 
     [RelayCommand]
-    public async Task RemoverEmpleadoAsync(Usuario empleado)
+    public async Task RemoverEmpleadoAsync(EmpleadoFlotaItem item)
     {
+        var empleado = item?.Usuario;
         if (empleado == null || Shell.Current == null) return;
 
         bool confirmar = await Shell.Current.DisplayAlert(
-            "Confirmar",
-            $"¿Sacar a {empleado.Nombre} de tu flota? Perderá acceso inmediato a los viajes y datos de tu equipo.",
-            "Sí, sacarlo", "Cancelar");
+            AppResources.Global_Confirm,
+            AppResources.F(AppResources.AdminFleet_RemoveEmployeeConfirm, empleado.Nombre),
+            AppResources.AdminFleet_YesRemoveEmployee, AppResources.Global_Cancel);
         if (!confirmar) return;
 
-        IsLoading = true;
-        bool exito = await _supabaseService.RemoveEmployeeFromFleetAsync(empleado.Id);
-        IsLoading = false;
+        MainThread.BeginInvokeOnMainThread(() => IsLoading = true);
 
-        if (exito) await LoadFleetDataAsync();
-        else await Shell.Current.DisplayAlert("Error", "No se pudo sacar al empleado.", "OK");
+        bool exito = await _supabaseService.RemoveEmployeeFromFleetAsync(empleado.Id);
+
+        MainThread.BeginInvokeOnMainThread(async () => {
+            IsLoading = false;
+            if (exito) await LoadFleetDataAsync();
+            else await Shell.Current.DisplayAlert(AppResources.Global_Error, AppResources.AdminFleet_RemoveEmployeeError, AppResources.Global_Ok);
+        });
     }
 
     [RelayCommand]
@@ -387,20 +500,23 @@ public partial class AdminFleetViewModel : ObservableObject
     {
         if (vehiculo == null || Shell.Current == null) return;
 
-        bool confirmar = await Shell.Current.DisplayAlert("Confirmar", $"¿Estás seguro de que deseas eliminar el microbús {vehiculo.Placa} de tu flota?", "Sí, eliminar", "Cancelar");
+        bool confirmar = await Shell.Current.DisplayAlert(AppResources.Global_Confirm, AppResources.F(AppResources.AdminFleet_DeleteBusConfirm, vehiculo.Placa), AppResources.AdminFleet_YesDelete, AppResources.Global_Cancel);
         if (!confirmar) return;
 
-        IsLoading = true;
-        bool exito = await _supabaseService.DeleteVehicleAsync(vehiculo.Id);
-        IsLoading = false;
+        MainThread.BeginInvokeOnMainThread(() => IsLoading = true);
 
-        if (exito)
-        {
-            await LoadFleetDataAsync();
-        }
-        else
-        {
-            await Shell.Current.DisplayAlert("Error", "No se pudo eliminar el microbús. Es posible que tenga viajes asignados en el historial.", "OK");
-        }
+        bool exito = await _supabaseService.DeleteVehicleAsync(vehiculo.Id);
+
+        MainThread.BeginInvokeOnMainThread(async () => {
+            IsLoading = false;
+            if (exito)
+            {
+                await LoadFleetDataAsync();
+            }
+            else
+            {
+                await Shell.Current.DisplayAlert(AppResources.Global_Error, AppResources.AdminFleet_DeleteBusError, AppResources.Global_Ok);
+            }
+        });
     }
 }

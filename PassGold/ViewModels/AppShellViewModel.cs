@@ -1,3 +1,5 @@
+// Evita el choque con Android.App.Application al compilar para Android
+using Application = Microsoft.Maui.Controls.Application;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PassGold.Services;
@@ -5,6 +7,8 @@ using PassGold.Models.Local;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
 using Microsoft.Extensions.DependencyInjection;
+
+using PassGold.Helpers;
 
 namespace PassGold.ViewModels;
 
@@ -14,7 +18,7 @@ public partial class AppShellViewModel : ObservableObject
     public static AppShellViewModel Instance => _instance ??= new AppShellViewModel();
 
     [ObservableProperty] private bool isLogged = false;
-    [ObservableProperty] private string userName = "Cargando...";
+    [ObservableProperty] private string userName = AppResources.Global_Loading;
     [ObservableProperty] private string userRole = "";
     [ObservableProperty] private string userEmail = "";
 
@@ -23,14 +27,15 @@ public partial class AppShellViewModel : ObservableObject
     [ObservableProperty] private bool isIndependiente = false;
     [ObservableProperty] private bool isPasajero = false;
 
-    public bool CanManageFleet => IsJefe || IsIndependiente;
+    // 🆕 Empleado con permiso del jefe para crear y editar viajes (sub-jefe)
+    [ObservableProperty] private bool esSubJefe = false;
+
+    public bool CanManageFleet => IsJefe || IsIndependiente || (IsEmpleado && EsSubJefe);
 
     [ObservableProperty] private FlyoutBehavior flyoutState = FlyoutBehavior.Disabled;
 
     public async Task UpdateMenuStateAsync()
     {
-        // ?? LA SOLUCI�N AL MEN� INVISIBLE:
-        // Leemos el rol desde SQLite (instant�neo y offline) en lugar de depender del internet.
         var localDb = Application.Current?.Handler?.MauiContext?.Services.GetService<LocalDatabaseService>() ?? new LocalDatabaseService();
         var localUser = await localDb.ObtenerSesionActivaAsync();
 
@@ -49,11 +54,14 @@ public partial class AppShellViewModel : ObservableObject
             OnPropertyChanged(nameof(CanManageFleet));
 
             IsLogged = true;
-            FlyoutState = FlyoutBehavior.Flyout; // ENCIENDE EL MEN� DE INMEDIATO
+            FlyoutState = FlyoutBehavior.Flyout;
+
+            // 🆕 El permiso de sub-jefe lo da el jefe desde su celular: se consulta en línea
+            if (IsEmpleado) _ = RefrescarPermisoSubJefeAsync(localUser.Id);
+            else EsSubJefe = false;
             return;
         }
 
-        // Fallback a la nube por si es una instalaci�n completamente nueva
         var user = SupabaseService.Instance.GetCurrentUser();
         if (user != null && !string.IsNullOrEmpty(user.Id))
         {
@@ -69,6 +77,7 @@ public partial class AppShellViewModel : ObservableObject
                 IsEmpleado = rolLower.Contains("empleado");
                 IsIndependiente = rolLower.Contains("independiente") || rolLower.Contains("independent");
                 IsPasajero = rolLower.Contains("pasajero") || rolLower.Contains("passenger");
+                EsSubJefe = RolesFlota.EsSubJefe(data);
 
                 OnPropertyChanged(nameof(CanManageFleet));
 
@@ -80,11 +89,26 @@ public partial class AppShellViewModel : ObservableObject
         ResetMenu();
     }
 
+    private async Task RefrescarPermisoSubJefeAsync(string userId)
+    {
+        try
+        {
+            var data = await SupabaseService.Instance.GetUserDataAsync(userId);
+            bool sub = RolesFlota.EsSubJefe(data);
+            Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(() =>
+            {
+                EsSubJefe = sub;
+                OnPropertyChanged(nameof(CanManageFleet));
+            });
+        }
+        catch { }
+    }
+
     public void ResetMenu()
     {
-        IsLogged = false; IsJefe = false; IsEmpleado = false; IsIndependiente = false; IsPasajero = false;
+        IsLogged = false; IsJefe = false; IsEmpleado = false; IsIndependiente = false; IsPasajero = false; EsSubJefe = false;
         FlyoutState = FlyoutBehavior.Disabled;
-        UserName = "Invitado"; UserRole = ""; UserEmail = "";
+        UserName = AppResources.Shell_Guest; UserRole = ""; UserEmail = "";
         OnPropertyChanged(nameof(CanManageFleet));
     }
 
@@ -92,7 +116,8 @@ public partial class AppShellViewModel : ObservableObject
     public async Task GoToHomeAsync()
     {
         Shell.Current.FlyoutIsPresented = false;
-        string destino = IsPasajero ? "///passenger-dashboard" : "///driver-dashboard";
+        // Corregido de "///" a "//" para evitar el error de rutas globales en la pila
+        string destino = IsPasajero ? "//passenger-dashboard" : "//driver-dashboard";
         await Shell.Current.GoToAsync(destino);
     }
 

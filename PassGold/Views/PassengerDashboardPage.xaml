@@ -6,10 +6,12 @@
              x:Class="PassGold.Views.PassengerDashboardPage"
              xmlns:viewmodels="clr-namespace:PassGold.ViewModels"
              Shell.NavBarIsVisible="True"
-             Title="Mi Panel"
+             Title="{helpers:Translate PDash_Title}"
              BackgroundColor="{AppThemeBinding Light={StaticResource LightBg}, Dark={StaticResource DarkBg}}">
 
     <Grid RowDefinitions="Auto, Auto, *">
+
+        <!-- Header con Foto y Nombre -->
         <Grid Grid.Row="0" ColumnDefinitions="Auto, *" Padding="20,20,20,10" ColumnSpacing="15">
             <Border Grid.Column="0" WidthRequest="50" HeightRequest="50" StrokeShape="RoundRectangle 25" StrokeThickness="0" BackgroundColor="{StaticResource Primary}">
                 <Grid>
@@ -23,23 +25,43 @@
             </VerticalStackLayout>
         </Grid>
 
+        <!-- Pestañas (Modificado para iOS) -->
         <Grid Grid.Row="1" ColumnDefinitions="*, *" Margin="20,10" BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}">
-            <Button Grid.Column="0" Text="📅 Mi Horario" BackgroundColor="{StaticResource Primary}" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" CornerRadius="0" FontAttributes="Bold" IsEnabled="False"/>
-            <Button Grid.Column="1" Text="🔍 Buscar Flotas" Clicked="BuscarFlotas_Clicked" BackgroundColor="Transparent" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" CornerRadius="0" FontAttributes="Bold"/>
+            <Border Grid.Column="0" BackgroundColor="{StaticResource Primary}" StrokeThickness="0">
+                <Label Text="{helpers:Translate PDash_MySchedule}" TextColor="#000000" FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center"/>
+            </Border>
+            <Button Grid.Column="1" Text="{helpers:Translate PDash_SearchFleets}" Clicked="BuscarFlotas_Clicked" BackgroundColor="Transparent" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" CornerRadius="0" FontAttributes="Bold"/>
         </Grid>
 
+        <!-- Calendario y Contenido -->
         <Grid Grid.Row="2" VerticalOptions="Fill">
             <Grid RowDefinitions="Auto, Auto, *">
                 <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto" Margin="10,0,10,10">
                     <Button Grid.Column="0" Text="◀" Command="{Binding RetrocederSemanaCommand}" BackgroundColor="Transparent" TextColor="{StaticResource Primary}" FontSize="20"/>
                     <VerticalStackLayout Grid.Column="1" HorizontalOptions="Center" VerticalOptions="Center">
-                        <Label Text="Semana Activa" FontAttributes="Bold" FontSize="15" HorizontalOptions="Center"/>
+                        <Label Text="{helpers:Translate PDash_ActiveWeek}" FontAttributes="Bold" FontSize="15" HorizontalOptions="Center"/>
                         <Label Text="{Binding TextoRangoFechas}" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource LightHint}, Dark={StaticResource DarkHint}}" HorizontalOptions="Center"/>
                     </VerticalStackLayout>
                     <Button Grid.Column="2" Text="▶" Command="{Binding AvanzarSemanaCommand}" BackgroundColor="Transparent" TextColor="{StaticResource Primary}" FontSize="20"/>
                 </Grid>
 
-                <Label Grid.Row="1" IsVisible="{Binding IsMyScheduleEmpty}" Text="Aún no tienes viajes programados." HorizontalOptions="Center" VerticalOptions="Center" Margin="0,40" TextColor="{AppThemeBinding Light={StaticResource LightHint}, Dark={StaticResource DarkHint}}"/>
+                <Label Grid.Row="1" IsVisible="{Binding IsMyScheduleEmpty}" Text="{helpers:Translate PDash_NoTripsYet}" HorizontalOptions="Center" VerticalOptions="Center" Margin="0,40" TextColor="{AppThemeBinding Light={StaticResource LightHint}, Dark={StaticResource DarkHint}}"/>
+
+                <!-- Atajo para Viaje en Curso (Visible solo cuando está en tiempo de rastreo) -->
+                <VerticalStackLayout Grid.Row="1" IsVisible="{Binding HasViajeEnCurso}" Spacing="10" Margin="10,10,10,20">
+                    <Label Text="{helpers:Translate PDash_TripInProgress}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
+                    <Border BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Stroke="{StaticResource Primary}" StrokeThickness="2" StrokeShape="RoundRectangle 12" Padding="15">
+                        <Grid RowDefinitions="Auto, Auto" RowSpacing="10">
+                            <Label Grid.Row="0" Text="{Binding InfoViajeEnCurso}" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+
+                            <Button Grid.Row="1" Text="{helpers:Translate Track_Btn}" 
+                                    Command="{Binding VerMapaChoferCommand}" 
+                                    CommandParameter="{Binding IdReservaEnCurso}" 
+                                    BackgroundColor="{StaticResource Primary}" 
+                                    TextColor="White" FontAttributes="Bold" CornerRadius="8" HeightRequest="40"/>
+                        </Grid>
+                    </Border>
+                </VerticalStackLayout>
 
                 <ScrollView Grid.Row="2" VerticalOptions="Fill">
                     <Grid IsVisible="{Binding IsMyScheduleEmpty, Converter={StaticResource InvertedBoolConverter}}" ColumnDefinitions="75, *" Padding="10">
@@ -69,14 +91,19 @@
                                             <HorizontalStackLayout BindableLayout.ItemsSource="{Binding ReservasDeLaSemana}" Spacing="5">
                                                 <BindableLayout.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Border WidthRequest="180" HeightRequest="130" StrokeShape="RoundRectangle 8" StrokeThickness="0">
+                                                        <Border WidthRequest="180" HeightRequest="165" StrokeShape="RoundRectangle 8" StrokeThickness="0">
                                                             <Grid>
                                                                 <Border IsVisible="{Binding TieneViaje}" BackgroundColor="{Binding ColorFondo}" Padding="10" StrokeThickness="0">
-                                                                    <Grid RowDefinitions="Auto, *, Auto, Auto" RowSpacing="2">
+                                                                    <Grid RowDefinitions="Auto, *, Auto, Auto, Auto" RowSpacing="2">
                                                                         <Label Grid.Row="0" Text="{Binding InfoFlota}" FontAttributes="Bold" FontSize="12" TextColor="White" HorizontalOptions="Center"/>
                                                                         <BoxView Grid.Row="1" HeightRequest="1" Color="#55FFFFFF" Margin="0,2"/>
                                                                         <Label Grid.Row="2" Text="{Binding InfoTransporte}" FontSize="11" TextColor="White" HorizontalOptions="Center" HorizontalTextAlignment="Center"/>
-                                                                        <Button Grid.Row="3" Text="✖ Anular Viaje" Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PassengerDashboardViewModel}}, Path=CancelarMiReservaCommand}" CommandParameter="{Binding IdReserva}" HeightRequest="25" FontSize="10" CornerRadius="4" BackgroundColor="#E53935" TextColor="White" Padding="0" Margin="0,5,0,0"/>
+                                                                        <!-- 🆕 Contactar al chofer de este viaje -->
+                                                                        <Grid Grid.Row="3" ColumnDefinitions="*,*" ColumnSpacing="4" Margin="0,4,0,0" IsVisible="{Binding TieneTelefono}">
+                                                                            <Button Grid.Column="0" Text="{helpers:Translate PassengerDetail_Call}" Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PassengerDashboardViewModel}}, Path=LlamarChoferCommand}" CommandParameter="{Binding TelefonoChofer}" HeightRequest="26" FontSize="10" CornerRadius="4" BackgroundColor="#33FFFFFF" TextColor="White" Padding="0"/>
+                                                                            <Button Grid.Column="1" Text="💬 WhatsApp" Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PassengerDashboardViewModel}}, Path=WhatsAppChoferCommand}" CommandParameter="{Binding TelefonoChofer}" HeightRequest="26" FontSize="10" CornerRadius="4" BackgroundColor="#25D366" TextColor="White" Padding="0"/>
+                                                                        </Grid>
+                                                                        <Button Grid.Row="4" Text="{helpers:Translate PDash_CancelTripBtn}" Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:PassengerDashboardViewModel}}, Path=CancelarMiReservaCommand}" CommandParameter="{Binding IdReserva}" HeightRequest="25" FontSize="10" CornerRadius="4" BackgroundColor="#E53935" TextColor="White" Padding="0" Margin="0,5,0,0"/>
                                                                     </Grid>
                                                                 </Border>
                                                                 <Border IsVisible="{Binding TieneViaje, Converter={StaticResource InvertedBoolConverter}}" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" StrokeThickness="0" />

@@ -8,6 +8,9 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
+using Microsoft.Maui.ApplicationModel;
+
+using PassGold.Helpers;
 
 namespace PassGold.ViewModels;
 
@@ -17,6 +20,8 @@ public partial class FleetDirectoryViewModel : ObservableObject
 
     [ObservableProperty] private bool isLoading;
     [ObservableProperty] private string textoBusqueda = "";
+    // 🆕 Lo que se muestra cuando la lista está vacía (antes: pantalla en blanco sin explicación)
+    [ObservableProperty] private string mensajeVacio = "";
 
     private List<FlotaPasajeroCard> _todasLasFlotas = new();
     public ObservableCollection<FlotaPasajeroCard> FlotasDisponibles { get; } = new();
@@ -24,60 +29,103 @@ public partial class FleetDirectoryViewModel : ObservableObject
     [RelayCommand]
     public async Task LoadDirectoryAsync()
     {
-        // Evitar recargar si ya bajamos las flotas
         if (_todasLasFlotas.Count > 0) return;
 
-        IsLoading = true;
+        MainThread.BeginInvokeOnMainThread(() => { IsLoading = true; MensajeVacio = ""; });
+
         try
         {
-            var flotas = await _supabaseService.GetPublicFleetsAsync();
-            _todasLasFlotas.Clear();
-            FlotasDisponibles.Clear();
+            // Sin sesión real de Supabase, las reglas de seguridad no devuelven ninguna flota
+            if (_supabaseService.GetCurrentUser() == null)
+            {
+                MainThread.BeginInvokeOnMainThread(() =>
+                    MensajeVacio = AppResources.Directory_SessionInactive);
+                return;
+            }
+
+            // 🔧 Consulta propia (antes GetPublicFleetsAsync escondía cualquier error y
+            // devolvía la lista vacía sin decir nada)
+            var client = _supabaseService.Client;
+            if (client == null)
+            {
+                MainThread.BeginInvokeOnMainThread(() => MensajeVacio = AppResources.Global_NoServerConnection);
+                return;
+            }
+            var respuesta = await client.From<Usuario>().Get();
+            var flotas = (respuesta.Models ?? new List<Usuario>())
+                .Where(u => (u.Rol ?? "").Contains("jefe", StringComparison.OrdinalIgnoreCase)
+                         || (u.Rol ?? "").Contains("owner", StringComparison.OrdinalIgnoreCase)
+                         || (u.Rol ?? "").Contains("independiente", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            var flotasProcesadas = new List<FlotaPasajeroCard>();
 
             foreach (var flota in flotas)
             {
                 var rutasUnicas = new List<string>();
                 if (!string.IsNullOrWhiteSpace(flota.RutasFlota))
                     rutasUnicas = flota.RutasFlota.Split(new[] { ',', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(r => r.Trim()).Distinct().ToList();
-                if (rutasUnicas.Count == 0) rutasUnicas.Add("Rutas a convenir");
+                if (rutasUnicas.Count == 0) rutasUnicas.Add(AppResources.Fleet_RoutesToAgree);
 
-                var card = new FlotaPasajeroCard
+                flotasProcesadas.Add(new FlotaPasajeroCard
                 {
                     IdFlota = flota.Id,
-                    NombreFlota = string.IsNullOrEmpty(flota.NombreFlota) ? $"Transportes {flota.Nombre}" : flota.NombreFlota,
+                    NombreFlota = string.IsNullOrEmpty(flota.NombreFlota) ? AppResources.F(AppResources.Fleet_DefaultName, flota.Nombre) : flota.NombreFlota,
                     NombreJefe = flota.Nombre ?? "",
                     FotoPerfil = flota.FotoPerfil ?? "",
                     Telefono = flota.Telefono ?? "",
                     RutasList = rutasUnicas,
                     FlotaOriginal = flota
-                };
-
-                _todasLasFlotas.Add(card);
-                FlotasDisponibles.Add(card);
+                });
             }
+
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                _todasLasFlotas.Clear();
+                FlotasDisponibles.Clear();
+                foreach (var card in flotasProcesadas)
+                {
+                    _todasLasFlotas.Add(card);
+                    FlotasDisponibles.Add(card);
+                }
+                if (flotasProcesadas.Count == 0)
+                    MensajeVacio = AppResources.Directory_NoFleetsYet;
+            });
         }
-        catch { }
-        finally { IsLoading = false; }
+        catch (Exception ex)
+        {
+            CrashLogger.Guardar(ex, "FleetDirectoryViewModel.LoadDirectoryAsync");
+            MainThread.BeginInvokeOnMainThread(() =>
+                MensajeVacio = AppResources.F(AppResources.Directory_LoadError, ex.Message));
+        }
+        finally
+        {
+            MainThread.BeginInvokeOnMainThread(() => IsLoading = false);
+        }
     }
 
     [RelayCommand]
     public void BuscarFlotas()
     {
-        FlotasDisponibles.Clear();
-        if (string.IsNullOrWhiteSpace(TextoBusqueda))
+        MainThread.BeginInvokeOnMainThread(() =>
         {
-            foreach (var f in _todasLasFlotas) FlotasDisponibles.Add(f);
-            return;
-        }
+            FlotasDisponibles.Clear();
+            if (string.IsNullOrWhiteSpace(TextoBusqueda))
+            {
+                foreach (var f in _todasLasFlotas) FlotasDisponibles.Add(f);
+                return;
+            }
 
-        var palabrasClave = TextoBusqueda.ToLowerInvariant().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-        var resultados = _todasLasFlotas.Where(f =>
-        {
-            string datosFlota = $"{f.NombreFlota}{f.NombreJefe}{string.Join("", f.RutasList)}".ToLowerInvariant().Replace(" ", "");
-            return palabrasClave.All(palabra => datosFlota.Contains(palabra));
-        }).ToList();
+            var palabrasClave = TextoBusqueda.ToLowerInvariant().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var resultados = _todasLasFlotas.Where(f =>
+            {
+                string datosFlota = $"{f.NombreFlota}{f.NombreJefe}{string.Join("", f.RutasList)}".ToLowerInvariant().Replace(" ", "");
+                return palabrasClave.All(palabra => datosFlota.Contains(palabra));
+            }).ToList();
 
-        foreach (var f in resultados) FlotasDisponibles.Add(f);
+            foreach (var f in resultados) FlotasDisponibles.Add(f);
+            if (resultados.Count == 0 && _todasLasFlotas.Count > 0)
+                MensajeVacio = AppResources.Directory_NoMatch;
+        });
     }
 
     [RelayCommand]
@@ -89,7 +137,6 @@ public partial class FleetDirectoryViewModel : ObservableObject
         {
             { "FlotaObj", flotaCard.FlotaOriginal }
         };
-        // Viajamos al Perfil Social de la flota
         await Shell.Current.GoToAsync("fleet-profile", navigationParams);
     }
 }

@@ -81,7 +81,7 @@ public partial class PasajeroReservaViewModel : ObservableObject
     {
         IsLoading = true;
         ViajeActual = await _supabaseService.GetViajeByIdAsync(opcion.IdViajeBase);
-        EsIda = ViajeActual?.TipoViaje?.Contains("Ida", StringComparison.OrdinalIgnoreCase) ?? true;
+        EsIda = (ViajeActual == null || AppResources.IsInboundTrip(ViajeActual.TipoViaje));
         RedibujarSegunSubTab();
         IsLoading = false;
     }

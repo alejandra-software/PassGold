@@ -66,35 +66,8 @@ public partial class PasajeroReservaPage : ContentPage
         }
     }
 
-    // FIX: si la busqueda exacta falla, reintenta quitando tildes/eñes — error de tipeo
-    // comun en celular. No corrige ortografia real (eso necesitaria una API de pago),
-    // pero cubre el caso mas frecuente: "unicaes" vs "unicáes", "peña" vs "pena", etc.
-    private async Task<Location?> BuscarConReintentoAsync(string query)
-    {
-        string busquedaExacta = $"{query}, El Salvador";
-        var ubicaciones = await Geocoding.Default.GetLocationsAsync(busquedaExacta);
-        var encontrada = ubicaciones?.FirstOrDefault();
-        if (encontrada != null) return encontrada;
-
-        string sinTildes = QuitarTildes(query);
-        if (sinTildes != query)
-        {
-            var ubicaciones2 = await Geocoding.Default.GetLocationsAsync($"{sinTildes}, El Salvador");
-            encontrada = ubicaciones2?.FirstOrDefault();
-        }
-        return encontrada;
-    }
-
-    private static string QuitarTildes(string texto)
-    {
-        var normalizado = texto.Normalize(System.Text.NormalizationForm.FormD);
-        var sb = new System.Text.StringBuilder();
-        foreach (var c in normalizado)
-        {
-            var categoria = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c);
-            if (categoria != System.Globalization.UnicodeCategory.NonSpacingMark)
-                sb.Append(c);
-        }
-        return sb.ToString().Normalize(System.Text.NormalizationForm.FormC);
-    }
+    // Buscador compartido: siglas (Unicaes, UES...), sin tildes, Apple Maps en iPhone
+    // y filtro para que no devuelva lugares fuera del país o el "centro del país".
+    private Task<Location?> BuscarConReintentoAsync(string query)
+        => PassGold.Helpers.BuscadorLugares.BuscarAsync(query, MapaPasajero.VisibleRegion?.Center);
 }

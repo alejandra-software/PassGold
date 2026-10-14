@@ -1,4 +1,6 @@
 using PassGold.ViewModels;
+using Microsoft.Maui.Controls;
+using System;
 
 namespace PassGold.Views;
 

@@ -11,6 +11,7 @@ using Newtonsoft.Json;
 using Microsoft.Maui.Networking;
 using Microsoft.Maui.Maps;
 using System.Collections.Generic;
+using Microsoft.Maui.ApplicationModel;
 
 namespace PassGold.ViewModels;
 
@@ -20,8 +21,6 @@ public class PasajeroItem
     public string Nombre { get; set; } = "";
     public string Ubicacion { get; set; } = "";
     public string FotoUrl { get; set; } = "";
-    // Para la ficha de detalle — el chofer necesita poder llamar al pasajero
-    // cuando pierde la hora (pasa casi todos los días, según reporta la usuaria).
     public string Telefono { get; set; } = "";
     public double? Latitud { get; set; }
     public double? Longitud { get; set; }
@@ -37,8 +36,6 @@ public class ChoferOpcion
     public string NombreChofer { get; set; } = "";
     public string PlacaVehiculo { get; set; } = "";
     public int CapacidadVehiculo { get; set; } = 0;
-    // Nunca se traían — la pestaña "Operador" mostraba un 👤/🚐 fijo porque
-    // no había de dónde sacar la foto real. Se llenan en CargarDatosDeFlotaAsync.
     public string FotoChofer { get; set; } = "";
     public string FotoVehiculo { get; set; } = "";
     public string DisplayName => $"🚐 {NombreChofer} ({PlacaVehiculo})";
@@ -48,66 +45,53 @@ public class ChoferOpcion
 public partial class TripDetailsViewModel : ObservableObject
 {
     private readonly SupabaseService _supabaseService = SupabaseService.Instance;
+    private LocalDatabaseService GetLocalDb() => Application.Current?.Handler?.MauiContext?.Services.GetService<LocalDatabaseService>() ?? new LocalDatabaseService();
 
-    private LocalDatabaseService GetLocalDb() =>
-        Application.Current?.Handler?.MauiContext?.Services.GetService<LocalDatabaseService>() ?? new LocalDatabaseService();
+    // Evento para comunicar a la vista que debe centrar el mapa
+    public event Action<double, double>? OnCentrarMapa;
 
     [ObservableProperty] private bool _hayMultiplesChoferes = false;
     [ObservableProperty] private string _nombreChofer = AppResources.Dashboard_Loading;
     [ObservableProperty] private string _placaVehiculo = AppResources.Dashboard_Loading;
     [ObservableProperty] private int _capacidadVehiculo = 0;
     [ObservableProperty] private bool _listaVacia = true;
-    //  Fotos del chofer/vehículo para la pestaña "Operador" — antes no existían.
     [ObservableProperty] private string _fotoChofer = "";
     [ObservableProperty] private string _fotoVehiculo = "";
 
     [ObservableProperty] private double? metaLatitud;
     [ObservableProperty] private double? metaLongitud;
     [ObservableProperty] private string metaTexto = "";
-
-    //  Vista satélite/híbrida — se usa en el mapa chico y en el de pantalla
-    // completa, comparten el mismo estado para que no se desincronicen.
     [ObservableProperty] private MapType currentMapType = MapType.Street;
-
-    [RelayCommand]
-    public void ToggleMapType()
-    {
-        CurrentMapType = CurrentMapType == MapType.Street ? MapType.Hybrid : MapType.Street;
-    }
-
-    //  NUEVO: saber si es viaje de Ida o Regreso, para saber a que pestaña
-    // del mapa pertenece la meta del chofer.
     [ObservableProperty] private bool esIda = true;
+    [ObservableProperty] private bool hayConexion = true; // NUEVO: Control de red
 
     [ObservableProperty] private int _tabIndex = 0;
     [ObservableProperty] private bool _isPasajerosTab = true;
     [ObservableProperty] private bool _isMapaTab = false;
     [ObservableProperty] private bool _isOperadorTab = false;
-
-    //  NUEVO: sub-pestañas dentro de "Mapa" — Recogida vs Bajada, en vez de
-    // un solo mapa con todos los pines revueltos.
     [ObservableProperty] private bool isMapaSubTabRecogida = true;
-
-    //  NUEVO: pantalla completa del mapa
     [ObservableProperty] private bool isMapaPantallaCompleta = false;
 
+    [RelayCommand] public void ToggleMapType() => CurrentMapType = CurrentMapType == MapType.Street ? MapType.Hybrid : MapType.Street;
+    [RelayCommand] public void CambiarSubTabMapa(string tab) => IsMapaSubTabRecogida = tab == "Recogida";
+
     [RelayCommand]
-    public void CambiarSubTabMapa(string tab)
+    public void CambiarPestana(string tab)
     {
-        IsMapaSubTabRecogida = tab == "Recogida";
+        TabIndex = tab == "Pasajeros" ? 0 : tab == "Mapa" ? 1 : 2;
+        IsPasajerosTab = TabIndex == 0;
+        IsMapaTab = TabIndex == 1;
+        IsOperadorTab = TabIndex == 2;
     }
+
+    [RelayCommand] public void SwipeLeft() { if (TabIndex < 2) CambiarPestana(TabIndex == 0 ? "Mapa" : "Operador"); }
+    [RelayCommand] public void SwipeRight() { if (TabIndex > 0) CambiarPestana(TabIndex == 2 ? "Mapa" : "Pasajeros"); }
 
     private string _idAsignacion = "";
     public string IdAsignacion
     {
         get => _idAsignacion;
-        set
-        {
-            if (SetProperty(ref _idAsignacion, value) && !string.IsNullOrEmpty(value))
-            {
-                _ = CargarDatosDeFlotaAsync();
-            }
-        }
+        set { if (SetProperty(ref _idAsignacion, value) && !string.IsNullOrEmpty(value)) _ = CargarDatosDeFlotaAsync(); }
     }
 
     private ChoferOpcion? _choferSeleccionado;
@@ -118,12 +102,8 @@ public partial class TripDetailsViewModel : ObservableObject
         {
             if (SetProperty(ref _choferSeleccionado, value) && value != null)
             {
-                NombreChofer = value.NombreChofer;
-                PlacaVehiculo = value.PlacaVehiculo;
-                CapacidadVehiculo = value.CapacidadVehiculo;
-                FotoChofer = value.FotoChofer;
-                FotoVehiculo = value.FotoVehiculo;
-
+                NombreChofer = value.NombreChofer; PlacaVehiculo = value.PlacaVehiculo;
+                CapacidadVehiculo = value.CapacidadVehiculo; FotoChofer = value.FotoChofer; FotoVehiculo = value.FotoVehiculo;
                 _ = CargarPasajerosPorMicrobusAsync(value.IdAsignacion);
             }
         }
@@ -132,30 +112,9 @@ public partial class TripDetailsViewModel : ObservableObject
     public ObservableCollection<ChoferOpcion> ChoferesAsignados { get; } = new();
     public ObservableCollection<PasajeroItem> Pasajeros { get; } = new();
 
-    [RelayCommand]
-    public void CambiarPestana(string tab)
-    {
-        if (tab == "Pasajeros") SetTab(0);
-        else if (tab == "Mapa") SetTab(1);
-        else if (tab == "Operador") SetTab(2);
-    }
-
-    [RelayCommand]
-    public void SwipeLeft() { if (TabIndex < 2) SetTab(TabIndex + 1); }
-
-    [RelayCommand]
-    public void SwipeRight() { if (TabIndex > 0) SetTab(TabIndex - 1); }
-
-    private void SetTab(int index)
-    {
-        TabIndex = index;
-        IsPasajerosTab = index == 0;
-        IsMapaTab = index == 1;
-        IsOperadorTab = index == 2;
-    }
-
     private async Task CargarDatosDeFlotaAsync()
     {
+        HayConexion = Connectivity.Current.NetworkAccess == NetworkAccess.Internet;
         var localDb = GetLocalDb();
         string cacheKey = $"TripDetails_Flota_{IdAsignacion}";
 
@@ -163,13 +122,10 @@ public partial class TripDetailsViewModel : ObservableObject
         if (!string.IsNullOrEmpty(cacheFlota))
         {
             var listaFlota = JsonConvert.DeserializeObject<List<ChoferOpcion>>(cacheFlota);
-            if (listaFlota != null && listaFlota.Count > 0)
-            {
-                PintarChoferes(listaFlota);
-            }
+            if (listaFlota != null && listaFlota.Count > 0) MainThread.BeginInvokeOnMainThread(() => PintarChoferes(listaFlota));
         }
 
-        if (Connectivity.Current.NetworkAccess == NetworkAccess.Internet)
+        if (HayConexion)
         {
             _ = Task.Run(async () =>
             {
@@ -178,16 +134,15 @@ public partial class TripDetailsViewModel : ObservableObject
                     var asignacionReal = await _supabaseService.GetAsignacionByIdAsync(IdAsignacion);
                     if (asignacionReal == null) return;
 
-                    var viajesActivos = await _supabaseService.GetAllActiveTripsAsync();
-                    var viajeReal = viajesActivos.FirstOrDefault(v => v.Id == asignacionReal.IdViaje);
+                    // 🔧 FIX: antes traía TODOS los viajes activos de TODAS las flotas
+                    // solo para buscar este uno con FirstOrDefault. Ahora pide
+                    // directamente el único viaje que necesita.
+                    var viajeReal = await _supabaseService.GetTripByIdAsync(asignacionReal.IdViaje);
 
                     var todasAsignacionesMes = await _supabaseService.GetAsignacionesPorRangoAsync(asignacionReal.Fecha.AddDays(-1), asignacionReal.Fecha.AddDays(1));
-                    var asignacionesMismoViaje = todasAsignacionesMes
-                        .Where(a => a.IdViaje == asignacionReal.IdViaje && a.Fecha.ToLocalTime().Date == asignacionReal.Fecha.ToLocalTime().Date)
-                        .ToList();
+                    var asignacionesMismoViaje = todasAsignacionesMes.Where(a => a.IdViaje == asignacionReal.IdViaje && a.Fecha.ToLocalTime().Date == asignacionReal.Fecha.ToLocalTime().Date).ToList();
 
                     var nuevaListaChoferes = new List<ChoferOpcion>();
-
                     foreach (var asig in asignacionesMismoViaje)
                     {
                         var chInfo = await _supabaseService.GetUserDataAsync(asig.IdChofer);
@@ -207,12 +162,11 @@ public partial class TripDetailsViewModel : ObservableObject
 
                     await localDb.GuardarCacheAsync(cacheKey, JsonConvert.SerializeObject(nuevaListaChoferes));
 
-                    Application.Current?.Dispatcher.Dispatch(() =>
+                    MainThread.BeginInvokeOnMainThread(() =>
                     {
-                        MetaLatitud = viajeReal?.MetaLatitud;
-                        MetaLongitud = viajeReal?.MetaLongitud;
+                        MetaLatitud = viajeReal?.MetaLatitud; MetaLongitud = viajeReal?.MetaLongitud;
                         MetaTexto = viajeReal?.MetaTexto ?? "";
-                        EsIda = viajeReal?.TipoViaje?.Contains("Ida", StringComparison.OrdinalIgnoreCase) ?? true;
+                        EsIda = (viajeReal == null || AppResources.IsInboundTrip(viajeReal.TipoViaje));
                         PintarChoferes(nuevaListaChoferes);
                     });
                 }
@@ -225,29 +179,15 @@ public partial class TripDetailsViewModel : ObservableObject
     {
         ChoferesAsignados.Clear();
         foreach (var c in lista) ChoferesAsignados.Add(c);
-
         HayMultiplesChoferes = ChoferesAsignados.Count > 1;
 
         if (ChoferSeleccionado == null || !ChoferesAsignados.Any(c => c.IdAsignacion == ChoferSeleccionado.IdAsignacion))
-        {
             ChoferSeleccionado = ChoferesAsignados.FirstOrDefault(c => c.IdAsignacion == IdAsignacion) ?? ChoferesAsignados.FirstOrDefault();
-        }
         else
         {
-            //  FIX: sigue siendo el mismo chofer (mismo Id), pero la instancia es
-            // nueva — puede venir de la red después de mostrar primero la caché, y
-            // traer datos que la caché vieja no tenía (ej. FotoChofer/FotoVehiculo,
-            // que no existían antes de este cambio). Antes esto se ignoraba del
-            // todo, y la pantalla se quedaba con los valores viejos hasta cerrar y
-            // reabrir la app. No reasignamos ChoferSeleccionado en sí (para no
-            // disparar de nuevo la carga de pasajeros, que sí sigue siendo cara),
-            // solo refrescamos los campos que se muestran en pantalla.
             var actualizado = ChoferesAsignados.First(c => c.IdAsignacion == ChoferSeleccionado.IdAsignacion);
-            NombreChofer = actualizado.NombreChofer;
-            PlacaVehiculo = actualizado.PlacaVehiculo;
-            CapacidadVehiculo = actualizado.CapacidadVehiculo;
-            FotoChofer = actualizado.FotoChofer;
-            FotoVehiculo = actualizado.FotoVehiculo;
+            NombreChofer = actualizado.NombreChofer; PlacaVehiculo = actualizado.PlacaVehiculo;
+            CapacidadVehiculo = actualizado.CapacidadVehiculo; FotoChofer = actualizado.FotoChofer; FotoVehiculo = actualizado.FotoVehiculo;
         }
     }
 
@@ -260,13 +200,10 @@ public partial class TripDetailsViewModel : ObservableObject
         if (!string.IsNullOrEmpty(cachePasajeros))
         {
             var listaPasajeros = JsonConvert.DeserializeObject<List<PasajeroItem>>(cachePasajeros);
-            if (listaPasajeros != null)
-            {
-                PintarPasajeros(listaPasajeros);
-            }
+            if (listaPasajeros != null) MainThread.BeginInvokeOnMainThread(() => PintarPasajeros(listaPasajeros));
         }
 
-        if (Connectivity.Current.NetworkAccess == NetworkAccess.Internet)
+        if (HayConexion)
         {
             _ = Task.Run(async () =>
             {
@@ -282,9 +219,6 @@ public partial class TripDetailsViewModel : ObservableObject
                         {
                             IdPasajero = reserva.IdPasajero,
                             Nombre = pasajeroInfo?.Nombre ?? AppResources.Dashboard_Unknown,
-                            //  FIX: pasajeroInfo YA traía la foto (FotoPerfil), pero nunca se
-                            // copiaba a PasajeroItem.FotoUrl — por eso esta lista mostraba el
-                            // mismo 🎓 fijo para todos, con foto o sin foto.
                             FotoUrl = pasajeroInfo?.FotoPerfil ?? "",
                             Telefono = pasajeroInfo?.Telefono ?? "",
                             Ubicacion = reserva.PuntoRecogidaTexto,
@@ -297,11 +231,7 @@ public partial class TripDetailsViewModel : ObservableObject
                     }
 
                     await localDb.GuardarCacheAsync(cacheKey, JsonConvert.SerializeObject(nuevaListaPasajeros));
-
-                    Application.Current?.Dispatcher.Dispatch(() =>
-                    {
-                        PintarPasajeros(nuevaListaPasajeros);
-                    });
+                    MainThread.BeginInvokeOnMainThread(() => PintarPasajeros(nuevaListaPasajeros));
                 }
                 catch { }
             });
@@ -313,5 +243,65 @@ public partial class TripDetailsViewModel : ObservableObject
         Pasajeros.Clear();
         foreach (var p in lista) Pasajeros.Add(p);
         ListaVacia = Pasajeros.Count == 0;
+    }
+
+    // ==========================================
+    // NUEVOS COMANDOS: CONTACTAR Y UBICAR
+    // ==========================================
+
+    [RelayCommand]
+    public async Task ContactarPasajeroAsync(PasajeroItem pasajero)
+    {
+        if (pasajero == null) return;
+
+        // Validar si el teléfono está vacío o es muy corto para ser real
+        if (string.IsNullOrWhiteSpace(pasajero.Telefono) || pasajero.Telefono.Length < 6)
+        {
+            await Shell.Current.DisplayAlert(AppResources.Global_Attention, AppResources.PassengerDetail_NoPhone, AppResources.Global_Ok);
+            return;
+        }
+
+        string optionWhatsapp = "📱 WhatsApp";
+        string optionCall = AppResources.PassengerDetail_Call;
+
+        string action = await Shell.Current.DisplayActionSheet(
+            $"{AppResources.PassengerDetail_Call} {pasajero.Nombre}",
+            AppResources.Global_Cancel,
+            null,
+            optionWhatsapp,
+            optionCall);
+
+        try
+        {
+            if (action == optionWhatsapp)
+                await Launcher.OpenAsync($"whatsapp://send?phone={pasajero.Telefono}");
+            else if (action == optionCall && PhoneDialer.Default.IsSupported)
+                PhoneDialer.Default.Open(pasajero.Telefono);
+        }
+        catch
+        {
+            await Shell.Current.DisplayAlert(AppResources.Global_Error, AppResources.PassengerDetail_CallError, AppResources.Global_Ok);
+        }
+    }
+
+    [RelayCommand]
+    public void UbicarEnMapa(PasajeroItem pasajero)
+    {
+        if (pasajero == null) return;
+
+        CambiarPestana("Mapa");
+
+        double? lat = IsMapaSubTabRecogida ? pasajero.Latitud : pasajero.LatitudBajada;
+        double? lng = IsMapaSubTabRecogida ? pasajero.Longitud : pasajero.LongitudBajada;
+
+        if (lat.HasValue && lng.HasValue)
+        {
+            // Dispara el evento para que el Code-Behind centre la cámara
+            OnCentrarMapa?.Invoke(lat.Value, lng.Value);
+        }
+        else
+        {
+            Shell.Current?.DisplayAlert(AppResources.TripDetails_PointNotSetTitle, AppResources.TripDetails_PointNotSetMsg, AppResources.Global_Ok);
+        }
     }
 }

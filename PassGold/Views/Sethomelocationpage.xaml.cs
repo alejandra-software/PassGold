@@ -12,6 +12,12 @@ public partial class SetHomeLocationPage : ContentPage
 {
     private static readonly Location UbicacionDefault = new(13.9946, -89.5597);
 
+    // 🛰️ Normal ⇄ satélite
+    private void CambiarTipoMapa_Clicked(object? sender, System.EventArgs e)
+    {
+        MapaCasa.MapType = MapaCasa.MapType == MapType.Street ? MapType.Hybrid : MapType.Street;
+    }
+
     public SetHomeLocationPage()
     {
         InitializeComponent();

@@ -11,12 +11,12 @@ public partial class DriverDashboardPage : ContentPage
         BindingContext = new DriverDashboardViewModel();
     }
 
-    protected override async void OnAppearing()
+    protected override async void OnAppearing() // ¡Añadido async!
     {
         base.OnAppearing();
         if (BindingContext is DriverDashboardViewModel vm)
         {
-            await vm.LoadDriverDataCommand.ExecuteAsync(null);
+            await vm.LoadDriverDataCommand.ExecuteAsync(null); // Esto ya estaba bien, pero faltaba el async arriba.
         }
     }
 }

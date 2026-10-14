@@ -35,7 +35,7 @@
                         <VerticalStackLayout Spacing="5">
                             <Label Text="{helpers:Translate SettingsPhoneLabel}" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
                             <Border Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeShape="RoundRectangle 8" Padding="10,0">
-                                <Entry Text="{Binding TelefonoInput}" Keyboard="Telephone" Placeholder="Ej. 70001234" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" />
+                                <Entry Text="{Binding TelefonoInput}" Keyboard="Telephone" Placeholder="{helpers:Translate AdminFleet_PhonePlaceholder}" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" />
                             </Border>
                         </VerticalStackLayout>
 
@@ -83,7 +83,7 @@
 
                             <HorizontalStackLayout Spacing="10" HorizontalOptions="Center">
                                 <Button Text="{helpers:Translate SettingsCopyBtn}" Command="{Binding CopyCodeCommand}" BackgroundColor="Transparent" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}" FontSize="13" BorderColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" BorderWidth="1" HeightRequest="40" Padding="15,0" CornerRadius="8"/>
-                                <Button Text="🔄 Regenerar" Command="{Binding RegenerateCodeCommand}" BackgroundColor="Transparent" TextColor="{StaticResource Error}" FontSize="13" BorderColor="{StaticResource Error}" BorderWidth="1" HeightRequest="40" Padding="15,0" CornerRadius="8"/>
+                                <Button Text="{helpers:Translate AdminFleet_RegenerateBtn}" Command="{Binding RegenerateCodeCommand}" BackgroundColor="Transparent" TextColor="{StaticResource Error}" FontSize="13" BorderColor="{StaticResource Error}" BorderWidth="1" HeightRequest="40" Padding="15,0" CornerRadius="8"/>
                             </HorizontalStackLayout>
 
                             <Label Text="{helpers:Translate SettingsInviteDesc}" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource LightHint}, Dark={StaticResource DarkHint}}" HorizontalOptions="Center" HorizontalTextAlignment="Center"/>
@@ -113,7 +113,7 @@
                                         <!-- DETALLES DEL VEHÍCULO -->
                                         <VerticalStackLayout Grid.Column="1" Spacing="5" VerticalOptions="Center">
                                             <Label Text="{Binding Placa}" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
-                                            <Label Text="{Binding Capacidad, StringFormat='Capacidad: {0}'}" FontSize="14" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                                            <Label Text="{Binding Capacidad, StringFormat={helpers:Translate AdminFleet_CapacityFormat}}" FontSize="14" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
                                         </VerticalStackLayout>
 
                                         <!-- BOTONES DE EDITAR Y ELIMINAR -->
@@ -151,7 +151,7 @@
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate>
                                     <Border Stroke="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" StrokeShape="RoundRectangle 8" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Padding="15">
-                                        <Grid ColumnDefinitions="Auto, *, Auto">
+                                        <Grid ColumnDefinitions="Auto, *, Auto" RowDefinitions="Auto, Auto">
 
                                             <!-- FOTO DEL EMPLEADO -->
                                             <Border Grid.Column="0" WidthRequest="50" HeightRequest="50" StrokeShape="RoundRectangle 25" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light={StaticResource LightBorder}, Dark={StaticResource DarkBorder}}" VerticalOptions="Center" Margin="0,0,15,0" Padding="0">
@@ -165,6 +165,7 @@
                                             <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
                                                 <Label Text="{Binding Nombre}" FontSize="16" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
                                                 <Label Text="{Binding Email}" FontSize="13" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                                                <Label Text="{helpers:Translate SubBoss_Badge}" IsVisible="{Binding PuedeGestionar}" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
                                             </VerticalStackLayout>
 
                                             <!-- BOTÓN PARA SACAR EMPLEADO -->
@@ -173,6 +174,15 @@
                                                     <FontImageSource FontFamily="OpenSansRegular" Glyph="🗑️" Color="{StaticResource Error}"/>
                                                 </ImageButton.Source>
                                             </ImageButton>
+
+                                            <!-- 🆕 PERMISO DE SUB-JEFE: crear y editar viajes -->
+                                            <Grid Grid.Row="1" Grid.ColumnSpan="3" ColumnDefinitions="*, Auto" Margin="0,12,0,0">
+                                                <VerticalStackLayout Grid.Column="0" Spacing="2" VerticalOptions="Center">
+                                                    <Label Text="{helpers:Translate SubBoss_SwitchTitle}" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource LightText}, Dark={StaticResource DarkText}}"/>
+                                                    <Label Text="{helpers:Translate SubBoss_SwitchDesc}" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}"/>
+                                                </VerticalStackLayout>
+                                                <Switch Grid.Column="1" IsToggled="{Binding PuedeGestionar}" OnColor="{StaticResource Primary}" VerticalOptions="Center"/>
+                                            </Grid>
 
                                         </Grid>
                                     </Border>

@@ -22,7 +22,7 @@
 
                 <!-- 📸 NUEVO: SECCIÓN PARA LA FOTO DEL MICROBÚS -->
                 <VerticalStackLayout Spacing="10" HorizontalOptions="Center" Margin="0,10">
-                    <Label Text="Foto de la Unidad" FontSize="13" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}" HorizontalOptions="Center"/>
+                    <Label Text="{helpers:Translate EditVehicle_PhotoLabel}" FontSize="13" TextColor="{AppThemeBinding Light={StaticResource LightTextSub}, Dark={StaticResource DarkTextSub}}" HorizontalOptions="Center"/>
 
                     <Border WidthRequest="160" HeightRequest="120" StrokeShape="RoundRectangle 12" Stroke="{StaticResource Primary}" StrokeThickness="2" BackgroundColor="{AppThemeBinding Light={StaticResource LightSurface}, Dark={StaticResource DarkSurface}}" Padding="0">
                         <Grid>

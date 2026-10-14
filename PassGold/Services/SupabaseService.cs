@@ -12,26 +12,27 @@ using Supabase.Gotrue;
 using Session = Supabase.Gotrue.Session;
 using SupabaseClient = Supabase.Client;
 using GotrueUser = Supabase.Gotrue.User;
+using Microsoft.Maui.ApplicationModel;
+using Microsoft.Maui.Authentication;
 
 namespace PassGold.Services;
 
 public class SupabaseService
 {
-    private const string SupabaseUrl = "";
-    private const string SupabaseAnonKey = "";
+    
 
     private static SupabaseService? _instance;
     private SupabaseClient? _supabaseClient;
     private Session? _currentSession;
     private bool _isInitialized = false;
 
-#if ANDROID
     public static TaskCompletionSource<(string? Token, string Error)>? GoogleSignInTcs;
-#endif
 
     public static SupabaseService Instance => _instance ??= new SupabaseService();
     public Session? CurrentSession => _currentSession;
     public bool IsAuthenticated => _currentSession != null;
+
+    public SupabaseClient? Client => _supabaseClient;
 
     public SupabaseService() { }
 
@@ -78,14 +79,14 @@ public class SupabaseService
         try
         {
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
-                return (false, "Error: El correo o contraseña se perdieron en la memoria.");
+                return (false, AppResources.Auth_CredentialsLost);
 
             await EnsureInitializedAsync();
-            if (_supabaseClient == null) return (false, "No se pudo conectar");
+            if (_supabaseClient == null) return (false, AppResources.Error_ConnectionFailed);
 
             var options = new SignUpOptions { Data = new Dictionary<string, object> { { "nombre", nombre }, { "rol", rol }, { "foto_perfil", fotoPerfil } } };
             await _supabaseClient.Auth.SignUp(email.Trim(), password, options);
-            return (true, "Registro exitoso.");
+            return (true, AppResources.Success_Registration);
         }
         catch (Exception ex) { return (false, ex.Message); }
     }
@@ -95,41 +96,54 @@ public class SupabaseService
         try
         {
             await EnsureInitializedAsync();
-            if (_supabaseClient == null) return (false, "Error de conexión", null);
+            if (_supabaseClient == null) return (false, AppResources.Error_Connection, null);
             var session = await _supabaseClient.Auth.SignInWithPassword(email.Trim(), password);
             _currentSession = session;
 
             string sessionJson = JsonConvert.SerializeObject(session);
             await SecureStorage.Default.SetAsync("supabase_session", sessionJson);
 
-            return (true, "Sesión iniciada", session);
+            return (true, AppResources.Success_Login, session);
         }
-        catch (Exception) { return (false, "Correo o contraseña incorrectos.", null); }
+        catch (Exception) { return (false, AppResources.Error_InvalidCredentials, null); }
     }
 
+    // MÉTODO PARA ANDROID (NATIVO)
     public async Task<(bool Success, string Message, Session? Session)> LoginWithGoogleNativeAsync()
     {
 #if ANDROID
         try
         {
             await EnsureInitializedAsync();
-
             string webClientId = "851890940381-7g35rn7qv9m7b2r8sshnaugjhkt7vtc3.apps.googleusercontent.com";
-
-            var context = Microsoft.Maui.ApplicationModel.Platform.CurrentActivity;
-            if (context == null) return (false, "No se pudo obtener el contexto de Android.", null);
-
-            var gso = new Android.Gms.Auth.Api.SignIn.GoogleSignInOptions.Builder(Android.Gms.Auth.Api.SignIn.GoogleSignInOptions.DefaultSignIn)
-                .RequestIdToken(webClientId)
-                .RequestEmail()
-                .Build();
-
-            var googleSignInClient = Android.Gms.Auth.Api.SignIn.GoogleSignIn.GetClient(context, gso);
-            googleSignInClient.SignOut();
-
             GoogleSignInTcs = new TaskCompletionSource<(string? Token, string Error)>();
 
-            context.StartActivityForResult(googleSignInClient.SignInIntent, 9001);
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                try
+                {
+                    var context = Platform.CurrentActivity;
+                    if (context == null)
+                    {
+                        GoogleSignInTcs.TrySetResult((null, AppResources.Auth_AndroidContextError));
+                        return;
+                    }
+
+                    var gso = new Android.Gms.Auth.Api.SignIn.GoogleSignInOptions.Builder(Android.Gms.Auth.Api.SignIn.GoogleSignInOptions.DefaultSignIn)
+                        .RequestIdToken(webClientId)
+                        .RequestEmail()
+                        .Build();
+
+                    var googleSignInClient = Android.Gms.Auth.Api.SignIn.GoogleSignIn.GetClient(context, gso);
+                    googleSignInClient.SignOut();
+
+                    context.StartActivityForResult(googleSignInClient.SignInIntent, 9001);
+                }
+                catch (Exception threadEx)
+                {
+                    GoogleSignInTcs.TrySetResult((null, threadEx.Message));
+                }
+            });
 
             var result = await GoogleSignInTcs.Task;
 
@@ -141,27 +155,66 @@ public class SupabaseService
                 {
                     _currentSession = session;
                     await SecureStorage.Default.SetAsync("supabase_session", JsonConvert.SerializeObject(session));
-                    return (true, "Sesión iniciada con Google", session);
+                    return (true, AppResources.Auth_GoogleSignedIn, session);
                 }
-                return (false, "No se pudo crear la sesión en Supabase.", null);
+                return (false, AppResources.Auth_SupabaseSessionError, null);
             }
             else
             {
-                if (result.Error.Contains("16") || result.Error.Contains("CANCELED"))
-                    return (false, "Operación cancelada.", null);
+                if (result.Error != null && (result.Error.Contains("16") || result.Error.Contains("CANCELED")))
+                    return (false, AppResources.Auth_CancelledByUser, null);
 
-                return (false, $"Falló la conexión con Google -> {result.Error}", null);
+                return (false, AppResources.F(AppResources.Auth_GoogleFailed, result.Error), null);
             }
         }
         catch (Exception ex)
         {
-            return (false, $"Error interno: {ex.Message}", null);
+            return (false, AppResources.F(AppResources.Auth_InternalError, ex.Message), null);
         }
 #else
-        return (false, "El login nativo solo está configurado para Android.", null);
+        return (false, AppResources.Auth_UseUniversalLogin, null);
 #endif
     }
 
+    // NUEVO MÉTODO PARA IPHONE (UNIVERSAL WEB AUTH)
+    public async Task<(bool Success, string Message, Session? Session)> LoginWithGoogleUniversalAsync()
+    {
+        try
+        {
+            await EnsureInitializedAsync();
+
+            var options = new SignInOptions { RedirectTo = "goldeenride://" };
+            var state = await _supabaseClient!.Auth.SignIn(Supabase.Gotrue.Constants.Provider.Google, options);
+
+            if (state?.Uri == null) return (false, AppResources.Auth_LinkError, null);
+
+            var authResult = await WebAuthenticator.Default.AuthenticateAsync(
+                new Uri(state.Uri.ToString()),
+                new Uri("goldeenride://"));
+
+            if (authResult?.Properties != null &&
+                authResult.Properties.TryGetValue("access_token", out string? accessToken) &&
+                authResult.Properties.TryGetValue("refresh_token", out string? refreshToken))
+            {
+                var session = await _supabaseClient.Auth.SetSession(accessToken, refreshToken);
+                _currentSession = session;
+                await SecureStorage.Default.SetAsync("supabase_session", JsonConvert.SerializeObject(session));
+                return (true, AppResources.Auth_GoogleSignedIn, session);
+            }
+
+            return (false, AppResources.Auth_NoValidCredentials, null);
+        }
+        catch (TaskCanceledException)
+        {
+            return (false, AppResources.Auth_SignInCancelled, null);
+        }
+        catch (Exception ex)
+        {
+            return (false, AppResources.F(AppResources.Auth_InternalError, ex.Message), null);
+        }
+    }
+
+    // ... (El resto de tus métodos de base de datos se quedan EXACTAMENTE igual a partir de aquí)
     public async Task<bool> LogoutAsync()
     {
         try
@@ -174,6 +227,127 @@ public class SupabaseService
             return true;
         }
         catch { return false; }
+    }
+
+    // ─────────── CAMBIAR DE ROL ───────────
+    // También pasa por la función "swift-worker": el servidor saca el id de la sesión,
+    // cambia el rol con la función SQL cambiar_rol_usuario y borra las fotos de los
+    // micros si se cerró una flota. Error: "mismo_rol", "codigo_invalido", "red"...
+    public async Task<(bool Ok, string Error, string? IdJefe, string? NombreJefe, int PasajerosAvisados)> CambiarRolAsync(string nuevoRol, string? codigoFlota)
+    {
+        try
+        {
+            await EnsureInitializedAsync();
+            if (_supabaseClient == null) return (false, "red", null, null, 0);
+
+            try { await _supabaseClient.Auth.RefreshSession(); } catch { }
+            string? token = _supabaseClient.Auth.CurrentSession?.AccessToken ?? _currentSession?.AccessToken;
+            if (string.IsNullOrEmpty(token)) return (false, "sesion", null, null, 0);
+
+            var payload = new Newtonsoft.Json.Linq.JObject
+            {
+                ["accion"] = "cambiar_rol",
+                ["rol"] = nuevoRol,
+                ["codigo"] = string.IsNullOrWhiteSpace(codigoFlota) ? null : codigoFlota.Trim().ToUpperInvariant()
+            };
+
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"{SupabaseUrl}/functions/v1/{FuncionEliminarCuenta}");
+            request.Headers.Add("apikey", SupabaseAnonKey);
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            request.Content = new System.Net.Http.StringContent(payload.ToString(), System.Text.Encoding.UTF8, "application/json");
+
+            using var response = await _httpEliminar.SendAsync(request);
+            string body = await response.Content.ReadAsStringAsync();
+            var json = Newtonsoft.Json.Linq.JObject.Parse(string.IsNullOrWhiteSpace(body) ? "{}" : body);
+
+            if (json["ok"]?.ToObject<bool>() == true)
+                return (true, "", json.Value<string>("id_jefe"), json.Value<string>("nombre_jefe"), json.Value<int?>("pasajeros_avisados") ?? 0);
+
+            Debug.WriteLine($"❌ cambiar_rol ({(int)response.StatusCode}): {body}");
+            return (false, json.Value<string>("error") ?? $"HTTP {(int)response.StatusCode}", null, null, 0);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"❌ cambiar_rol: {ex.Message}");
+            return (false, "red", null, null, 0);
+        }
+    }
+
+    // ─────────── PERMISO DE SUB-JEFE ───────────
+    // Solo funciona si quien llama es el jefe de ese empleado (lo revisa Supabase).
+    public async Task<bool> FijarPermisoViajesAsync(string idEmpleado, bool permitir)
+    {
+        try
+        {
+            await EnsureInitializedAsync();
+            if (_supabaseClient == null) return false;
+            var resp = await _supabaseClient.Rpc("fijar_permiso_viajes", new Dictionary<string, object>
+            {
+                { "p_empleado", idEmpleado },
+                { "p_permitir", permitir }
+            });
+            var json = Newtonsoft.Json.Linq.JObject.Parse(resp.Content ?? "{}");
+            return json["ok"]?.ToObject<bool>() == true;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"❌ fijar_permiso_viajes: {ex.Message}");
+            return false;
+        }
+    }
+
+    // ─────────── ELIMINAR CUENTA ───────────
+    // Llama a la Edge Function "eliminar-cuenta". El servidor saca el id del usuario
+    // de SU sesión (no de lo que mande la app), así nadie puede borrar otra cuenta.
+    // Supabase le puso el nombre automático "swift-worker" a la función de eliminar cuenta
+    // (la misma función también hace el cambio de rol).
+    private const string FuncionEliminarCuenta = "swift-worker";
+    private static readonly System.Net.Http.HttpClient _httpEliminar = new() { Timeout = TimeSpan.FromSeconds(60) };
+
+    public async Task<(bool Ok, string Error)> EliminarCuentaAsync()
+    {
+        try
+        {
+            await EnsureInitializedAsync();
+            if (_supabaseClient == null) return (false, AppResources.Error_Connection);
+
+            // Sesión fresca: si el token venció, el servidor respondería 401
+            try { await _supabaseClient.Auth.RefreshSession(); } catch { }
+            string? token = _supabaseClient.Auth.CurrentSession?.AccessToken ?? _currentSession?.AccessToken;
+            if (string.IsNullOrEmpty(token))
+            {
+                await IsSessionActiveAsync();
+                token = _supabaseClient.Auth.CurrentSession?.AccessToken ?? _currentSession?.AccessToken;
+            }
+            if (string.IsNullOrEmpty(token)) return (false, "Sin sesión / No session");
+
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"{SupabaseUrl}/functions/v1/{FuncionEliminarCuenta}");
+            request.Headers.Add("apikey", SupabaseAnonKey);
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            request.Content = new System.Net.Http.StringContent("{\"confirmar\":\"ELIMINAR\"}", System.Text.Encoding.UTF8, "application/json");
+
+            using var response = await _httpEliminar.SendAsync(request);
+            string body = await response.Content.ReadAsStringAsync();
+            bool ok = false;
+            try { ok = Newtonsoft.Json.Linq.JObject.Parse(body)["ok"]?.ToObject<bool>() == true; } catch { }
+
+            if (!response.IsSuccessStatusCode || !ok)
+            {
+                Debug.WriteLine($"❌ eliminar-cuenta ({(int)response.StatusCode}): {body}");
+                return (false, $"HTTP {(int)response.StatusCode}");
+            }
+
+            // La cuenta ya no existe: se limpia la sesión guardada en el celular
+            try { await _supabaseClient.Auth.SignOut(); } catch { }
+            _currentSession = null;
+            SecureStorage.Default.Remove("supabase_session");
+            return (true, "");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"❌ eliminar-cuenta: {ex.Message}");
+            return (false, ex.Message);
+        }
     }
 
     public GotrueUser? GetCurrentUser() => _supabaseClient?.Auth.CurrentUser;
@@ -330,7 +504,7 @@ public class SupabaseService
         catch { return null; }
     }
 
-    private string GenerarCodigoAleatorio(int longitud)
+    private static string GenerarCodigoAleatorio(int longitud)
     {
         var chars = new char[longitud];
         for (int i = 0; i < longitud; i++)
@@ -353,14 +527,14 @@ public class SupabaseService
         try
         {
             await EnsureInitializedAsync();
-            if (_supabaseClient == null) return (false, "Error de conexión.");
+            if (_supabaseClient == null) return (false, AppResources.Error_Connection);
 
             string codigoNormalizado = codigoFlota.Trim().ToUpperInvariant();
             var bossResponse = await _supabaseClient.From<Usuario>().Filter("codigo_flota", Supabase.Postgrest.Constants.Operator.Equals, codigoNormalizado).Get();
             var boss = bossResponse.Models?.FirstOrDefault();
 
             if (boss == null || !boss.Rol.ToLower().Contains("jefe"))
-                return (false, "El código ingresado no es válido.");
+                return (false, AppResources.Fleet_InvalidCode);
 
             try
             {
@@ -371,11 +545,11 @@ public class SupabaseService
             }
             catch (Exception updateEx) when (updateEx.Message.Contains("Sequence contains no elements")) { }
 
-            return (true, $"¡Te has unido con éxito a la flota de {boss.Nombre}!");
+            return (true, AppResources.F(AppResources.Success_JoinedFleet, boss.Nombre));
         }
         catch (Exception ex)
         {
-            return (false, $"Error al unirse: {ex.Message}");
+            return (false, AppResources.F(AppResources.Error_JoinFailed, ex.Message));
         }
     }
 
@@ -384,15 +558,15 @@ public class SupabaseService
         try
         {
             await EnsureInitializedAsync();
-            if (_supabaseClient == null) return (false, "Error de conexión");
+            if (_supabaseClient == null) return (false, AppResources.Error_Connection);
             var response = await _supabaseClient.From<Usuario>().Where(u => u.Email == emailEmpleado.Trim()).Get();
             var empleado = response.Models?.FirstOrDefault();
-            if (empleado == null) return (false, "No se encontró el correo.");
-            if (!empleado.Rol.Contains("empleado")) return (false, "Este usuario no es Chofer Empleado.");
-            if (!string.IsNullOrEmpty(empleado.IdJefe)) return (false, "Ya trabaja para otro jefe.");
+            if (empleado == null) return (false, AppResources.Error_EmailNotFound);
+            if (!empleado.Rol.Contains("empleado")) return (false, AppResources.Error_NotEmployee);
+            if (!string.IsNullOrEmpty(empleado.IdJefe)) return (false, AppResources.Error_AlreadyHasBoss);
             empleado.IdJefe = idJefe;
             await empleado.Update<Usuario>();
-            return (true, $"¡Vinculado con éxito!");
+            return (true, AppResources.Success_Linked);
         }
         catch (Exception ex) { return (false, ex.Message); }
     }
@@ -535,27 +709,32 @@ public class SupabaseService
         try
         {
             await EnsureInitializedAsync();
-            await _supabaseClient!.From<Asignacion>().Insert(asignaciones);
+            if (_supabaseClient == null || asignaciones.Count == 0) return (false, AppResources.Global_NoDataToSave);
+
+            int batchSize = 50;
+            for (int i = 0; i < asignaciones.Count; i += batchSize)
+            {
+                var lote = asignaciones.Skip(i).Take(batchSize).ToList();
+                await _supabaseClient.From<Asignacion>().Insert(lote);
+            }
+
             return (true, "");
         }
         catch (Exception ex) { return (false, ex.Message); }
     }
-
 
     public async Task<(bool Success, string Error)> CreateParadasBulkAsync(List<ViajeParada> paradas)
     {
         try
         {
             await EnsureInitializedAsync();
-            if (_supabaseClient == null || paradas.Count == 0) return (false, "Sin paradas para guardar");
+            if (_supabaseClient == null || paradas.Count == 0) return (false, AppResources.Global_NoStopsToSave);
             await _supabaseClient.From<ViajeParada>().Insert(paradas);
             return (true, "");
         }
         catch (Exception ex) { return (false, ex.Message); }
     }
 
-    // Lee las paradas oficiales guardadas de un viaje (para que el pasajero elija
-    // entre varias, ej. UNASA/UES/UNICAES, en vez de un solo punto fijo).
     public async Task<List<ViajeParada>> GetParadasByViajeAsync(string idViaje)
     {
         try
@@ -570,7 +749,6 @@ public class SupabaseService
         }
         catch { return new List<ViajeParada>(); }
     }
-
 
     public async Task<List<Viaje>> GetAllActiveTripsAsync(List<string>? idsCreadoresFlota = null)
     {
@@ -590,19 +768,33 @@ public class SupabaseService
 
             foreach (var v in modelos)
             {
-                // 🔧 UNIFICADO: antes este método convertía a "Local" (según la zona
-                // horaria del celular) directo acá adentro — mientras que otros
-                // métodos del mismo archivo solo etiquetaban el Kind sin convertir.
-                // Esa mezcla de estrategias distintas era la raíz del caos de horas
-                // incorrectas. Ahora TODOS los métodos hacen lo mismo: solo aseguran
-                // que el Kind diga "Utc" (sin tocar el número), y es la pantalla
-                // quien decide cómo mostrarlo, con ZonaHorariaHelper.AHoraElSalvador().
                 if (v.HoraSalida.Kind != DateTimeKind.Utc)
                     v.HoraSalida = DateTime.SpecifyKind(v.HoraSalida, DateTimeKind.Utc);
             }
             return modelos;
         }
         catch { return new List<Viaje>(); }
+    }
+
+    // 🆕 Trae UN solo viaje por su Id, en vez de traer la tabla `viajes` completa
+    // (de todas las flotas) solo para buscar uno con FirstOrDefault en el celular.
+    // Mismo patrón que GetAsignacionByIdAsync.
+    public async Task<Viaje?> GetTripByIdAsync(string idViaje)
+    {
+        try
+        {
+            await EnsureInitializedAsync();
+            if (_supabaseClient == null) return null;
+
+            var resp = await _supabaseClient.From<Viaje>().Filter("id", Supabase.Postgrest.Constants.Operator.Equals, idViaje).Get();
+            var viaje = resp.Models?.FirstOrDefault();
+
+            if (viaje != null && viaje.HoraSalida.Kind != DateTimeKind.Utc)
+                viaje.HoraSalida = DateTime.SpecifyKind(viaje.HoraSalida, DateTimeKind.Utc);
+
+            return viaje;
+        }
+        catch { return null; }
     }
 
     public async Task<List<Asignacion>> GetAsignacionesPorRangoAsync(DateTime fechaInicio, DateTime fechaFin, List<string>? idsChoferesFlota = null)
@@ -625,12 +817,6 @@ public class SupabaseService
 
             foreach (var asig in modelos)
             {
-                //  UNIFICADO — mismo criterio que arriba: solo normalizar el Kind,
-                // nunca convertir acá. Antes este método SÍ convertía a Local (usando
-                // ".ToLocalTime()"), a diferencia de GetAsignacionByIdAsync que no lo
-                // hacía — esa inconsistencia entre los dos métodos, combinada con
-                // cuál de los dos usaba cada pantalla, era la causa real de que
-                // "Mi Horario" y el calendario de reservar mostraran cosas distintas.
                 if (asig.Fecha.Kind != DateTimeKind.Utc)
                     asig.Fecha = DateTime.SpecifyKind(asig.Fecha, DateTimeKind.Utc);
             }
@@ -647,12 +833,6 @@ public class SupabaseService
             var resp = await _supabaseClient!.From<Asignacion>().Filter("id", Supabase.Postgrest.Constants.Operator.Equals, idAsignacion).Get();
             var asig = resp.Models?.FirstOrDefault();
 
-            //  FIX: este método nunca tuvo la normalización de Kind que ya tienen
-            // GetAsignacionesPorRangoAsync y GetAllActiveTripsAsync — exactamente el
-            // "es fácil olvidarlo" que ya habíamos anotado. "Mi Horario" arma sus
-            // asignaciones con ESTE método (una por una), así que si Fecha llegaba con
-            // Kind distinto al esperado según cómo Postgrest la haya deserializado, el
-            // resultado de .ToLocalTime() más adelante podía no ser consistente.
             if (asig != null && asig.Fecha.Kind != DateTimeKind.Utc)
                 asig.Fecha = DateTime.SpecifyKind(asig.Fecha, DateTimeKind.Utc);
 
@@ -660,11 +840,6 @@ public class SupabaseService
         }
         catch { return null; }
     }
-
-    //  Los 4 métodos siguientes reemplazan bucles que pedían los registros UNO
-    // POR UNO (una llamada de red por cada reserva) — con muchas reservas, eso
-    // se sentía como que la app se congelaba. Ahora se trae todo junto, en una
-    // sola consulta por tabla, sin importar cuántas reservas haya.
 
     public async Task<List<Asignacion>> GetAsignacionesByIdsAsync(List<string> ids)
     {
@@ -709,7 +884,8 @@ public class SupabaseService
             await EnsureInitializedAsync();
             if (_supabaseClient == null || ids.Count == 0) return new List<Vehiculo>();
             var resp = await _supabaseClient.From<Vehiculo>().Filter("id", Supabase.Postgrest.Constants.Operator.In, ids).Get();
-            return resp.Models ?? new List<Vehiculo>();
+            var modelos = resp.Models ?? new List<Vehiculo>();
+            return modelos;
         }
         catch { return new List<Vehiculo>(); }
     }
@@ -768,7 +944,7 @@ public class SupabaseService
         catch { return false; }
     }
 
-    public async Task<bool> UpdateRutaCompletaAsync(string idViaje, DateTime fechaDesde, string nuevoIdChofer, string nuevoIdVehiculo, TimeSpan nuevaHora)
+    public async Task<bool> UpdateRutaCompletaAsync(string idViaje, DateTime fechaDesde, string nuevoIdChofer, string nuevoIdVehiculo, TimeSpan nuevaHora, TimeSpan horaInicioRecorrido, TimeSpan horaLlegadaDestino, string metaTexto, double metaLat, double metaLon)
     {
         try
         {
@@ -797,6 +973,11 @@ public class SupabaseService
             {
                 DateTime templateLocalDate = viajeActual.HoraSalida.AHoraElSalvador().Date;
                 viajeActual.HoraSalida = templateLocalDate.Add(nuevaHora).ToUniversalTime();
+                viajeActual.HoraInicioRecorrido = horaInicioRecorrido;
+                viajeActual.HoraLlegadaDestino = horaLlegadaDestino;
+                viajeActual.MetaTexto = metaTexto;
+                viajeActual.MetaLatitud = metaLat;
+                viajeActual.MetaLongitud = metaLon;
                 await viajeActual.Update<Viaje>();
             }
             return true;
@@ -825,10 +1006,6 @@ public class SupabaseService
         }
         catch { return false; }
     }
-
-    // -------------------------------------------------------------
-    // MÉTODOS PARA LOGÍSTICA DE FLOTA Y UBICACIONES
-    // -------------------------------------------------------------
 
     public async Task<bool> UpdateUserDataAsync(Usuario userData)
     {
@@ -875,10 +1052,6 @@ public class SupabaseService
         }
     }
 
-    // ==========================================
-    // MÉTODOS NUEVOS PARA EL PASAJERO
-    // ==========================================
-
     public async Task<bool> DeleteReservaAsync(string idReserva)
     {
         try
@@ -904,9 +1077,6 @@ public class SupabaseService
             var response = await _supabaseClient.From<Viaje>().Where(v => v.Id == idViaje).Get();
             var viaje = response.Models?.FirstOrDefault();
 
-            // FIX: a este metodo (usado por el flujo del pasajero) le faltaba la misma
-            // normalizacion de zona horaria que ya tiene GetAllActiveTripsAsync (usado
-            // por el chofer). Por eso el chofer veia la hora bien y el pasajero no.
             if (viaje != null)
             {
                 if (viaje.HoraSalida.Kind == DateTimeKind.Unspecified)
@@ -939,6 +1109,31 @@ public class SupabaseService
         catch
         {
             return new List<Reserva>();
+        }
+    }
+
+    public async Task UpsertUbicacionEnVivoAsync(PassGold.Models.UbicacionEnVivo ubicacion)
+    {
+        try
+        {
+            await EnsureInitializedAsync();
+            await _supabaseClient!.From<PassGold.Models.UbicacionEnVivo>().Upsert(ubicacion);
+        }
+        catch { }
+    }
+
+    public async Task<List<UbicacionEnVivo>> GetUbicacionesEnVivoPorAsignacionAsync(string idAsignacion)
+    {
+        try
+        {
+            var response = await _supabaseClient.From<UbicacionEnVivo>()
+                                        .Where(x => x.IdAsignacion == idAsignacion)
+                                        .Get();
+            return response.Models;
+        }
+        catch
+        {
+            return new List<UbicacionEnVivo>();
         }
     }
 }

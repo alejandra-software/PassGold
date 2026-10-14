@@ -26,8 +26,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Ícono: debe coincidir con el nombre del archivo de MauiIcon (logo.png) -->
 	<key>XSAppIconAssets</key>
-	<string>Assets.xcassets/appicon.appiconset</string>
+	<string>Assets.xcassets/logo.appiconset</string>
 
 	<!-- INICIO CONFIGURACIÓN LOGIN SOCIAL (GOOGLE/APPLE) -->
 	<key>CFBundleURLTypes</key>
@@ -45,13 +46,10 @@
 	</array>
 	<!-- FIN CONFIGURACIÓN LOGIN SOCIAL -->
 
-	<!-- Permiso obligatorio para mostrar el punto azul del usuario en Apple Maps -->
+	<!-- Permiso obligatorio de ubicación (Actualizado para el rastreador de choferes) -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>PassGold necesita acceder a tu ubicación para mostrar tu posición exacta en el mapa de tu universidad.</string>
+	<string>PassGold necesita tu ubicación para mostrarte en el mapa y, si eres chofer, transmitir tu distancia en tiempo real a tus pasajeros durante un viaje para que salgan a tiempo.</string>
 
-	<!-- 🆕 Sin esto, la app crashea apenas tocás "Cambiar Foto" (perfil, vehículo,
-	     o en el registro) — iOS mata la app al instante si falta la descripción,
-	     no muestra ningún diálogo de permiso como hace Android. -->
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>PassGold necesita acceder a tus fotos para que puedas subir tu foto de perfil o la del microbús.</string>
 	<key>NSCameraUsageDescription</key>

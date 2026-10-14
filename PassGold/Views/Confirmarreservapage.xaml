@@ -4,182 +4,160 @@
              xmlns:maps="clr-namespace:Microsoft.Maui.Controls.Maps;assembly=Microsoft.Maui.Controls.Maps"
              xmlns:helpers="clr-namespace:PassGold.Helpers"
              xmlns:vm="clr-namespace:PassGold.ViewModels"
-             xmlns:models="clr-namespace:PassGold.Models"
              x:Class="PassGold.Views.ConfirmarReservaPage"
              Title="{helpers:Translate ConfirmarReserva_Title}"
              BackgroundColor="{AppThemeBinding Light=#F5F7FA, Dark=#121212}">
 
-    <Grid RowDefinitions="Auto, Auto, *, Auto">
+    <Grid RowDefinitions="*, Auto">
 
-        <!-- BUSCADOR (arriba del mapa) -->
-        <SearchBar x:Name="BuscadorConfirmar" Grid.Row="0" Placeholder="Buscar dirección o punto de referencia..." SearchButtonPressed="BuscadorConfirmar_SearchButtonPressed"/>
-
-        <!-- MAPA -->
-        <Grid Grid.Row="1" HeightRequest="280">
+        <!-- ═════════ MAPA ═════════ -->
+        <Grid Grid.Row="0">
             <maps:Map x:Name="MapaConfirmar" IsShowingUser="True" MapType="{Binding CurrentMapType}" MapClicked="MapaConfirmar_MapClicked"/>
 
-            <!--  Pestañas Recogida/Bajada — mismo patrón que TripDetailsPage del chofer -->
-            <HorizontalStackLayout HorizontalOptions="Center" VerticalOptions="End" Margin="0,0,0,10" Spacing="0"
-                                    BackgroundColor="#DD000000">
-                <Button Text="{helpers:Translate ConfirmarReserva_TabRecogida}" Command="{Binding VerRecogidaCommand}"
-                        FontSize="12" HeightRequest="36" Padding="14,0" CornerRadius="0"
-                        BackgroundColor="{Binding ViendoRecogida, Converter={StaticResource BoolToColorConverter}, ConverterParameter='Primary|Transparent'}"
-                        TextColor="{AppThemeBinding Light=Black, Dark=White}"/>
-                <Button Text="{helpers:Translate ConfirmarReserva_TabBajada}" Command="{Binding VerBajadaCommand}"
-                        FontSize="12" HeightRequest="36" Padding="14,0" CornerRadius="0"
-                        BackgroundColor="{Binding ViendoRecogida, Converter={StaticResource BoolToColorConverter}, ConverterParameter='Transparent|Primary'}"
-                        TextColor="{AppThemeBinding Light=Black, Dark=White}"/>
-            </HorizontalStackLayout>
-
-            <!--  Vista satélite/híbrida -->
-            <Button Text="🛰️" Command="{Binding ToggleMapTypeCommand}" FontSize="18" WidthRequest="42" HeightRequest="42" Padding="0"
-                    CornerRadius="21" BackgroundColor="#DD000000" TextColor="White"
-                    HorizontalOptions="End" VerticalOptions="Start" Margin="0,10,10,0"/>
-
-            <Border HorizontalOptions="Center" VerticalOptions="Start" Margin="0,10,0,0"
-                    BackgroundColor="#DD000000" StrokeShape="RoundRectangle 15" Padding="12,6" StrokeThickness="0">
-                <Label TextColor="White" FontAttributes="Bold" FontSize="13">
-                    <Label.Triggers>
-                        <DataTrigger TargetType="Label" Binding="{Binding TocandoCasa}" Value="True">
-                            <Setter Property="Text" Value="{helpers:Translate ConfirmarReserva_TocandoCasaHint}" />
-                        </DataTrigger>
-                        <DataTrigger TargetType="Label" Binding="{Binding TocandoCasa}" Value="False">
-                            <Setter Property="Text" Value="{helpers:Translate ConfirmarReserva_TocandoAlternoHint}" />
-                        </DataTrigger>
-                    </Label.Triggers>
-                </Label>
+            <Border BackgroundColor="{AppThemeBinding Light=#EEFFFFFF, Dark=#EE1E1E1E}" StrokeShape="RoundRectangle 10" StrokeThickness="1" Stroke="{StaticResource Primary}" Margin="15" VerticalOptions="Start">
+                <SearchBar x:Name="BuscadorConfirmar" Placeholder="{helpers:Translate Schedule_MapSearchPlaceholder}" SearchButtonPressed="BuscadorConfirmar_SearchButtonPressed" HeightRequest="45" TextColor="{AppThemeBinding Light=Black, Dark=White}"/>
             </Border>
 
-            <ActivityIndicator IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}" Color="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" WidthRequest="50" HeightRequest="50"/>
+            <VerticalStackLayout HorizontalOptions="End" VerticalOptions="Center" Margin="0,0,15,0" Spacing="15">
+                <Button Text="🛰️" Command="{Binding ToggleMapTypeCommand}" WidthRequest="50" HeightRequest="50" CornerRadius="25" BackgroundColor="#CC000000" TextColor="White" FontSize="20"/>
+                <!-- Agrandar / achicar el mapa (para celulares de pantalla chica) -->
+                <Button Command="{Binding ToggleMapExpansionCommand}" WidthRequest="50" HeightRequest="50" CornerRadius="25" BackgroundColor="{StaticResource Primary}" TextColor="Black" FontAttributes="Bold" FontSize="18">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" Binding="{Binding ShowDetailsPanel}" Value="True">
+                            <Setter Property="Text" Value="⤢" />
+                        </DataTrigger>
+                        <DataTrigger TargetType="Button" Binding="{Binding ShowDetailsPanel}" Value="False">
+                            <Setter Property="Text" Value="⤡" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+            </VerticalStackLayout>
+
+            <!-- Qué se está marcando ahora -->
+            <Border HorizontalOptions="Center" VerticalOptions="End" Margin="15,0,15,15" BackgroundColor="#DD000000" StrokeShape="RoundRectangle 15" Padding="15,8" StrokeThickness="0">
+                <Label Text="{Binding TextoAyudaMapa}" TextColor="White" FontAttributes="Bold" FontSize="13" HorizontalTextAlignment="Center"/>
+            </Border>
         </Grid>
 
-        <!-- FORMULARIO -->
-        <ScrollView Grid.Row="2">
-            <VerticalStackLayout Padding="15" Spacing="18">
+        <!-- ═════════ PANEL ═════════ -->
+        <Border Grid.Row="1" StrokeShape="RoundRectangle 25,25,0,0" BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}" StrokeThickness="0" IsVisible="{Binding ShowDetailsPanel}">
+            <Grid RowDefinitions="Auto, Auto">
 
-                <!--  INFO DEL CHOFER / VEHÍCULO -->
-                <Border StrokeShape="RoundRectangle 12" Stroke="{StaticResource Primary}" StrokeThickness="1" Padding="12" BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}">
-                    <Grid ColumnDefinitions="55, 55, *" ColumnSpacing="10">
-                        <Border Grid.Column="0" WidthRequest="55" HeightRequest="55" StrokeShape="RoundRectangle 27" StrokeThickness="0" BackgroundColor="{StaticResource Primary}">
-                            <Image Source="{Binding FotoChofer}" Aspect="AspectFill"/>
+                <ScrollView Grid.Row="0" MaximumHeightRequest="400">
+                    <VerticalStackLayout Padding="20,12" Spacing="14">
+
+                        <BoxView HeightRequest="5" WidthRequest="40" Color="{AppThemeBinding Light=#CCCCCC, Dark=#444444}" CornerRadius="2" HorizontalOptions="Center"/>
+
+                        <!-- Qué viajes se van a reservar -->
+                        <Label Text="{Binding ResumenSeleccion}" FontSize="12" TextColor="{AppThemeBinding Light=#555555, Dark=#BBBBBB}"/>
+
+                        <!-- Pestañas: casa / universidad -->
+                        <Border StrokeShape="RoundRectangle 10" StrokeThickness="1" Stroke="{StaticResource Primary}" BackgroundColor="Transparent">
+                            <Grid ColumnDefinitions="*,*">
+                                <Button Grid.Column="0" Text="{Binding TabCasaTexto}" Command="{Binding VerCasaCommand}" FontSize="14" FontAttributes="Bold" CornerRadius="0" HeightRequest="46"
+                                        BackgroundColor="{Binding EditandoCasa, Converter={StaticResource BoolToColorConverter}, ConverterParameter='Primary|Transparent'}"
+                                        TextColor="{AppThemeBinding Light=Black, Dark=White}"/>
+                                <Button Grid.Column="1" Text="{Binding TabUniversidadTexto}" Command="{Binding VerUniversidadCommand}" FontSize="14" FontAttributes="Bold" CornerRadius="0" HeightRequest="46"
+                                        BackgroundColor="{Binding EditandoCasa, Converter={StaticResource BoolToColorConverter}, ConverterParameter='Transparent|Primary'}"
+                                        TextColor="{AppThemeBinding Light=Black, Dark=White}"/>
+                            </Grid>
                         </Border>
-                        <Border Grid.Column="1" WidthRequest="55" HeightRequest="55" StrokeShape="RoundRectangle 10" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light=#EEE, Dark=#333}">
-                            <Image Source="{Binding FotoVehiculo}" Aspect="AspectFill"/>
+
+                        <!-- ── CASA ── -->
+                        <VerticalStackLayout Spacing="8" IsVisible="{Binding EditandoCasa}">
+                            <Label Text="{helpers:Translate Confirm_HomeHint}" FontSize="12" TextColor="{AppThemeBinding Light=#555555, Dark=#BBBBBB}"/>
+                            <Label Text="{helpers:Translate Confirm_AddressLabel}" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light=Black, Dark=White}"/>
+                            <Border StrokeShape="RoundRectangle 8" StrokeThickness="1" Stroke="{AppThemeBinding Light=#DDDDDD, Dark=#555555}" Padding="10,0">
+                                <Entry Text="{Binding AliasUbicacionPersonal}" Placeholder="{helpers:Translate Confirm_AddressPlaceholder}" MaxLength="80"
+                                       TextColor="{AppThemeBinding Light=Black, Dark=White}" FontSize="14"/>
+                            </Border>
+                            <Label Text="{helpers:Translate Confirm_AddressWarning}" FontSize="11" TextColor="Gray"/>
+                        </VerticalStackLayout>
+
+                        <!-- ── PUNTO OFICIAL O ALTERNO (ej. Metrocentro) ── -->
+                        <VerticalStackLayout Spacing="8" IsVisible="{Binding EditandoUniversidad}">
+                            <Label Text="{helpers:Translate Confirm_AltHint}" FontSize="12" TextColor="{AppThemeBinding Light=#555555, Dark=#BBBBBB}"/>
+                            <Label Text="{helpers:Translate Confirm_OfficialPointsLabel}" FontSize="13" FontAttributes="Bold" IsVisible="{Binding HayPuntosOficiales}" TextColor="{AppThemeBinding Light=Black, Dark=White}"/>
+                            <FlexLayout BindableLayout.ItemsSource="{Binding PuntosOficiales}" Wrap="Wrap" JustifyContent="Start" IsVisible="{Binding HayPuntosOficiales}">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Text="{Binding Texto}" Margin="0,0,8,8" Padding="12,0" HeightRequest="40" FontSize="13" CornerRadius="20"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type vm:ConfirmarReservaViewModel}}, Path=SeleccionarPuntoOficialCommand}" CommandParameter="{Binding .}"
+                                                BackgroundColor="{AppThemeBinding Light=#E3F2FD, Dark=#0D47A1}" TextColor="{AppThemeBinding Light=#0D47A1, Dark=White}"/>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </FlexLayout>
+                            <Label FontSize="13" TextColor="{AppThemeBinding Light=#0D47A1, Dark=#90CAF9}">
+                                <Label.FormattedText>
+                                    <FormattedString>
+                                        <Span Text="{helpers:Translate Confirm_ChosenPrefix}" FontAttributes="Bold"/>
+                                        <Span Text="{Binding TextoAlterno}"/>
+                                    </FormattedString>
+                                </Label.FormattedText>
+                            </Label>
+                        </VerticalStackLayout>
+
+                        <!-- ── MIS LUGARES (historial) ── -->
+                        <VerticalStackLayout Spacing="6" IsVisible="{Binding HayLugares}">
+                            <Label Text="{Binding TextoAyudaLugares}" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light=Black, Dark=White}"/>
+                            <FlexLayout BindableLayout.ItemsSource="{Binding MisLugares}" Wrap="Wrap" JustifyContent="Start">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Text="{Binding Texto}" Margin="0,0,8,8" Padding="12,0" HeightRequest="40" FontSize="13" CornerRadius="20" LineBreakMode="TailTruncation" MaximumWidthRequest="300"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type vm:ConfirmarReservaViewModel}}, Path=SeleccionarLugarCommand}" CommandParameter="{Binding .}"
+                                                BackgroundColor="{AppThemeBinding Light=#EEEEEE, Dark=#333333}" TextColor="{AppThemeBinding Light=Black, Dark=White}"/>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </FlexLayout>
+                        </VerticalStackLayout>
+                        <Label Text="{helpers:Translate Confirm_SavedPlacesHint}" FontSize="12" FontAttributes="Italic" TextColor="Gray"
+                               IsVisible="{Binding HayLugares, Converter={StaticResource InvertedBoolConverter}}"/>
+
+                        <!-- ── ESPEJO: cómo quedan recogida y bajada en cada dirección ── -->
+                        <Border StrokeShape="RoundRectangle 12" StrokeThickness="1" Padding="12"
+                                Stroke="{AppThemeBinding Light=#DDDDDD, Dark=#444444}" BackgroundColor="{AppThemeBinding Light=#FAFAFA, Dark=#252525}">
+                            <VerticalStackLayout Spacing="10">
+                                <Label Text="{helpers:Translate Confirm_SummaryTitle}" FontAttributes="Bold" FontSize="15" TextColor="{AppThemeBinding Light=Black, Dark=White}"/>
+                                <VerticalStackLayout Spacing="2" IsVisible="{Binding HayIda}">
+                                    <Label Text="{helpers:Translate Confirm_InboundLabel}" FontAttributes="Bold" FontSize="13" TextColor="#2E7D32"/>
+                                    <Label Text="{Binding EspejoIda}" FontSize="13" TextColor="{AppThemeBinding Light=#333333, Dark=#DDDDDD}"/>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Spacing="2" IsVisible="{Binding HayRegreso}">
+                                    <Label Text="{helpers:Translate Confirm_OutboundLabel}" FontAttributes="Bold" FontSize="13" TextColor="#1565C0"/>
+                                    <Label Text="{Binding EspejoRegreso}" FontSize="13" TextColor="{AppThemeBinding Light=#333333, Dark=#DDDDDD}"/>
+                                </VerticalStackLayout>
+                            </VerticalStackLayout>
                         </Border>
-                        <VerticalStackLayout Grid.Column="2" VerticalOptions="Center" Spacing="2">
-                            <Label Text="{Binding NombreChofer}" FontAttributes="Bold" FontSize="15"/>
-                            <Label Text="{Binding PlacaVehiculo}" FontSize="13" TextColor="{AppThemeBinding Light=#666, Dark=#999}"/>
-                            <Label Text="{Binding TelefonoChofer}" FontSize="13" TextColor="{StaticResource Primary}" IsVisible="{Binding HayTelefonoChofer}"/>
-                        </VerticalStackLayout>
-                    </Grid>
-                </Border>
 
-                <!-- CASA -->
-                <Border StrokeShape="RoundRectangle 12" Stroke="#2E7D32" StrokeThickness="2" Padding="12" BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}">
-                    <VerticalStackLayout Spacing="6">
-                        <HorizontalStackLayout Spacing="8">
-                            <Label Text="🟢" FontSize="18"/>
-                            <Label Text="{Binding TituloExtremoFijo}" FontAttributes="Bold" FontSize="15" VerticalOptions="Center"/>
-                        </HorizontalStackLayout>
-                        <Label Text="{helpers:Translate ConfirmarReserva_CasaFijaDesc}" FontSize="12" TextColor="{AppThemeBinding Light=#666, Dark=#999}"/>
-                        <Button Text="{helpers:Translate ConfirmarReserva_TocarCasaBtn}" Command="{Binding ActivarEdicionCasaCommand}"
-                                BackgroundColor="Transparent" TextColor="#2E7D32" BorderColor="#2E7D32" BorderWidth="1" FontSize="13" HeightRequest="38"/>
+                        <!-- ── REPETIR CADA SEMANA ── -->
+                        <Border StrokeShape="RoundRectangle 12" Stroke="{StaticResource Primary}" StrokeThickness="2" Padding="15" BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}">
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="{helpers:Translate Confirm_RepeatTitle}" FontAttributes="Bold" FontSize="15" TextColor="{AppThemeBinding Light=Black, Dark=White}"/>
+                                <Label Text="{helpers:Translate Confirm_RepeatDesc}" FontSize="12" TextColor="Gray"/>
+                                <Picker Title="{helpers:Translate Confirm_RepeatPickerTitle}" ItemsSource="{Binding OpcionesAlcance}" SelectedItem="{Binding AlcanceSeleccionado, Mode=TwoWay}"
+                                        TextColor="{AppThemeBinding Light=Black, Dark=White}" TitleColor="{StaticResource Primary}"/>
+                                <VerticalStackLayout Spacing="6" IsVisible="{Binding UsandoRangoPersonalizado}">
+                                    <Label Text="{helpers:Translate Confirm_RepeatUntil}" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light=Black, Dark=White}"/>
+                                    <Border BackgroundColor="{AppThemeBinding Light=#F5F7FA, Dark=#2C2C2C}" StrokeThickness="1" Stroke="{AppThemeBinding Light=#DDDDDD, Dark=#555555}" StrokeShape="RoundRectangle 8" Padding="10,0" HeightRequest="45">
+                                        <DatePicker Date="{Binding FechaHastaPersonalizada}" MinimumDate="{Binding FechaMinimaRango}" MaximumDate="{Binding FechaMaximaRango}" Format="{helpers:Translate Fmt_DayMonthLong}"
+                                                    TextColor="{AppThemeBinding Light=Black, Dark=White}" VerticalOptions="Center"/>
+                                    </Border>
+                                </VerticalStackLayout>
+                            </VerticalStackLayout>
+                        </Border>
+
                     </VerticalStackLayout>
+                </ScrollView>
+
+                <Border Grid.Row="1" BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}" Padding="15,10,15,20" StrokeThickness="0">
+                    <Button Text="{helpers:Translate ConfirmarReserva_ConfirmarBtn}" Command="{Binding ConfirmarCommand}"
+                            IsEnabled="{Binding IsSaving, Converter={StaticResource InvertedBoolConverter}}"
+                            BackgroundColor="{StaticResource Primary}" TextColor="Black" FontAttributes="Bold" HeightRequest="52" CornerRadius="10"/>
                 </Border>
+            </Grid>
+        </Border>
 
-                <!-- PUNTO ALTERNO -->
-                <Border StrokeShape="RoundRectangle 12" Stroke="#1565C0" StrokeThickness="2" Padding="12" BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}">
-                    <VerticalStackLayout Spacing="10">
-                        <HorizontalStackLayout Spacing="8">
-                            <Label Text="🔵" FontSize="18"/>
-                            <Label Text="{Binding TituloExtremoAlterno}" FontAttributes="Bold" FontSize="15" VerticalOptions="Center"/>
-                        </HorizontalStackLayout>
-
-                        <!--  FIX: la Meta Oficial ahora SIEMPRE tiene un botón propio, exista una
-                             sola meta vieja o varias paradas en viaje_paradas -->
-                        <Button Text="{Binding TextoBotonMetaOficial}" Command="{Binding SeleccionarMetaOficialCommand}"
-                                IsVisible="{Binding HayMetaOficialDisponible}"
-                                BackgroundColor="#E3F2FD" TextColor="#1565C0" FontSize="13" HeightRequest="42" HorizontalOptions="Fill"
-                                IsEnabled="{Binding HayVariasParadasOficiales, Converter={StaticResource InvertedBoolConverter}}"/>
-
-                        <Label Text="{helpers:Translate ConfirmarReserva_ParadasOficialesLabel}" FontSize="12" TextColor="{AppThemeBinding Light=#666, Dark=#999}" IsVisible="{Binding HayVariasParadasOficiales}"/>
-                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding ParadasOficiales}" Spacing="6" IsVisible="{Binding HayVariasParadasOficiales}">
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate x:DataType="models:ViajeParada">
-                                    <Button Text="{Binding NombreLugar, StringFormat='🏁 {0}'}"
-                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:ConfirmarReservaViewModel}}, Path=SeleccionarParadaOficialCommand}"
-                                            CommandParameter="{Binding .}"
-                                            BackgroundColor="#E3F2FD" TextColor="#1565C0" FontSize="13" HeightRequest="42" HorizontalOptions="Fill"/>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </VerticalStackLayout>
-
-                        <Label Text="{helpers:Translate ConfirmarReserva_MisUbicacionesLabel}" FontSize="12" TextColor="{AppThemeBinding Light=#666, Dark=#999}"/>
-                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding MisUbicaciones}" Spacing="6">
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate x:DataType="models:UbicacionPasajero">
-                                    <Button Text="{Binding DireccionTexto, StringFormat='⭐ {0}'}"
-                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:ConfirmarReservaViewModel}}, Path=SeleccionarUbicacionGuardadaCommand}"
-                                            CommandParameter="{Binding .}"
-                                            BackgroundColor="#FFF8E1" TextColor="#8D6E00" FontSize="13" HeightRequest="42" HorizontalOptions="Fill"/>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </VerticalStackLayout>
-
-                        <Button Text="{helpers:Translate ConfirmarReserva_PinNuevoBtn}" Command="{Binding ActivarModoMapaParaAlternoCommand}"
-                                BackgroundColor="Transparent" TextColor="#1565C0" BorderColor="#1565C0" BorderWidth="1" FontSize="13" HeightRequest="38"/>
-
-                        <VerticalStackLayout Spacing="6">
-                            <HorizontalStackLayout Spacing="8">
-                                <CheckBox IsChecked="{Binding GuardarNuevoAlternoEnHistorial}" Color="{StaticResource Primary}"/>
-                                <Label Text="{helpers:Translate ConfirmarReserva_GuardarNuevoLabel}" FontSize="12" VerticalOptions="Center"/>
-                            </HorizontalStackLayout>
-                            <Entry Placeholder="{helpers:Translate ConfirmarReserva_AliasPlaceholder}" Text="{Binding NuevoAliasAlterno}"/>
-                        </VerticalStackLayout>
-
-                        <HorizontalStackLayout Spacing="5">
-                            <Label Text="{helpers:Translate ConfirmarReserva_ElegidoLabel}" FontSize="13" FontAttributes="Bold" TextColor="#1565C0"/>
-                            <Label Text="{Binding TextoAlterno}" FontSize="13" TextColor="#1565C0"/>
-                        </HorizontalStackLayout>
-                    </VerticalStackLayout>
-                </Border>
-
-                <!--  FIX: alcance ahora es una fila de botones bien visibles, no un Picker nativo -->
-                <Border StrokeShape="RoundRectangle 12" Stroke="{StaticResource Primary}" StrokeThickness="2" Padding="12" BackgroundColor="{AppThemeBinding Light=White, Dark=#1E1E1E}">
-                    <VerticalStackLayout Spacing="10">
-                        <Label Text="{helpers:Translate ConfirmarReserva_ParaCuandoLabel}" FontAttributes="Bold" FontSize="15"/>
-                        <FlexLayout BindableLayout.ItemsSource="{Binding OpcionesAlcance}" Wrap="Wrap" JustifyContent="Start">
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate x:DataType="x:String">
-                                    <Button Text="{Binding .}" Margin="0,0,8,8" FontSize="12" HeightRequest="38" Padding="12,0"
-                                            Command="{Binding Source={RelativeSource AncestorType={x:Type vm:ConfirmarReservaViewModel}}, Path=SeleccionarAlcanceCommand}"
-                                            CommandParameter="{Binding .}"
-                                            BackgroundColor="{AppThemeBinding Light=#EEE, Dark=#333}" TextColor="{AppThemeBinding Light=Black, Dark=White}"/>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </FlexLayout>
-                        <HorizontalStackLayout Spacing="5">
-                            <Label Text="{helpers:Translate ConfirmarReserva_ElegidoLabel}" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
-                            <Label Text="{Binding AlcanceSeleccionado}" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource Primary}"/>
-                        </HorizontalStackLayout>
-
-                        <!--  Rango de fecha libre — solo se ve si se eligió "Elegir hasta qué fecha" -->
-                        <VerticalStackLayout Spacing="6" IsVisible="{Binding UsandoRangoPersonalizado}">
-                            <Label Text="{helpers:Translate ConfirmarReserva_RangoHastaLabel}" FontSize="13" FontAttributes="Bold"/>
-                            <DatePicker Date="{Binding FechaHastaPersonalizada}"
-                                        MinimumDate="{Binding FechaMinimaRango}"
-                                        MaximumDate="{Binding FechaMaximaRango}"/>
-                        </VerticalStackLayout>
-                    </VerticalStackLayout>
-                </Border>
-
-            </VerticalStackLayout>
-        </ScrollView>
-
-        <!-- CONFIRMAR -->
-        <Button Grid.Row="3" Margin="15" Text="{helpers:Translate ConfirmarReserva_ConfirmarBtn}" Command="{Binding ConfirmarCommand}"
-                IsEnabled="{Binding IsSaving, Converter={StaticResource InvertedBoolConverter}}"
-                BackgroundColor="{StaticResource Primary}" TextColor="Black" FontAttributes="Bold" HeightRequest="52" CornerRadius="10"/>
-
+        <ActivityIndicator Grid.RowSpan="2" IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}" Color="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" WidthRequest="50" HeightRequest="50"/>
+        <ActivityIndicator Grid.RowSpan="2" IsRunning="{Binding IsSaving}" IsVisible="{Binding IsSaving}" Color="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" WidthRequest="50" HeightRequest="50"/>
     </Grid>
 </ContentPage>

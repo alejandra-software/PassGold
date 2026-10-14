@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Media;
 
+using PassGold.Helpers;
+
 namespace PassGold.ViewModels;
 
 public partial class AddVehicleViewModel : ObservableObject
@@ -62,7 +64,11 @@ public partial class AddVehicleViewModel : ObservableObject
                 // la app a producción y volver al genérico de una sola línea.
                 await Shell.Current.DisplayAlert(
                     GetString("Global_Error", "Error"),
-                    $"No se pudo subir la foto. Revisa tu conexión e intenta de nuevo.\n\nDIAGNÓSTICO: {error}",
+#if DEBUG
+                    AppResources.Vehicle_PhotoUploadError + AppResources.F(AppResources.Global_Diagnostic, error),
+#else
+                    AppResources.Vehicle_PhotoUploadError,
+#endif
                     GetString("Global_Ok", "OK"));
             }
         }
@@ -83,13 +89,13 @@ public partial class AddVehicleViewModel : ObservableObject
 
         if (string.IsNullOrWhiteSpace(Placa) || string.IsNullOrWhiteSpace(Capacidad))
         {
-            await Shell.Current.DisplayAlert(GetString("Global_Attention", "Atención"), "Por favor llena todos los campos de texto.", GetString("Global_Ok", "OK"));
+            await Shell.Current.DisplayAlert(GetString("Global_Attention", "Atención"), AppResources.AlertEmptyFields, GetString("Global_Ok", "OK"));
             return;
         }
 
         if (!int.TryParse(Capacidad, out int capacidadNum))
         {
-            await Shell.Current.DisplayAlert(GetString("Global_Attention", "Atención"), "La capacidad debe ser un número válido.", GetString("Global_Ok", "OK"));
+            await Shell.Current.DisplayAlert(GetString("Global_Attention", "Atención"), AppResources.AlertInvalidCapacity, GetString("Global_Ok", "OK"));
             return;
         }
 
@@ -118,12 +124,12 @@ public partial class AddVehicleViewModel : ObservableObject
 
         if (exito)
         {
-            await Shell.Current.DisplayAlert(GetString("Schedule_Success", "¡Éxito!"), "El microbús ha sido guardado correctamente.", GetString("Global_Ok", "OK"));
+            await Shell.Current.DisplayAlert(GetString("Schedule_Success", "¡Éxito!"), AppResources.AlertVehicleSaved, GetString("Global_Ok", "OK"));
             await Shell.Current.GoToAsync("..");
         }
         else
         {
-            await Shell.Current.DisplayAlert(GetString("Global_Error", "Error"), "No se pudo guardar el vehículo. Intenta de nuevo.", GetString("Global_Ok", "OK"));
+            await Shell.Current.DisplayAlert(GetString("Global_Error", "Error"), AppResources.AlertVehicleSaveError, GetString("Global_Ok", "OK"));
         }
     }
 }

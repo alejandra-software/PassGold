@@ -1,3 +1,5 @@
+// Evita el choque con Android.App.Application al compilar para Android
+using Application = Microsoft.Maui.Controls.Application;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.Devices.Sensors;
@@ -13,6 +15,8 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Maui.ApplicationModel;
+using Microsoft.Maui.Controls;
 
 namespace PassGold.ViewModels;
 
@@ -28,21 +32,22 @@ public class WaypointTemporal
     public double Latitud { get; set; }
     public double Longitud { get; set; }
     public string Alias { get; set; } = "";
+    public string Detalle { get; set; } = "";
 }
 
 public partial class ScheduleTripViewModel : ObservableObject
 {
     private readonly SupabaseService _supabaseService = SupabaseService.Instance;
 
-    public ObservableCollection<string> TiposViaje { get; } = [];
-    public ObservableCollection<Vehiculo> VehiculosDisponibles { get; } = [];
-    public ObservableCollection<Usuario> ChoferesDisponibles { get; } = [];
-    public ObservableCollection<AsignacionTemporal> Asignaciones { get; } = [];
+    public ObservableCollection<string> TiposViaje { get; } = new();
+    public ObservableCollection<Vehiculo> VehiculosDisponibles { get; } = new();
+    public ObservableCollection<Usuario> ChoferesDisponibles { get; } = new();
+    public ObservableCollection<AsignacionTemporal> Asignaciones { get; } = new();
 
-    public ObservableCollection<WaypointTemporal> MetasDelViaje { get; } = [];
+    public ObservableCollection<WaypointTemporal> MetasDelViaje { get; } = new();
     public bool HasMetas => MetasDelViaje.Count > 0;
 
-    public ObservableCollection<WaypointTemporal> DestinosFrecuentes { get; } = [];
+    public ObservableCollection<WaypointTemporal> DestinosFrecuentes { get; } = new();
     public bool HasDestinosFrecuentes => DestinosFrecuentes.Count > 0;
 
     [ObservableProperty] private WaypointTemporal? destinoFrecuenteSeleccionado;
@@ -51,8 +56,11 @@ public partial class ScheduleTripViewModel : ObservableObject
     [ObservableProperty] private TimeSpan horaSalida = new(6, 30, 0);
     [ObservableProperty] private TimeSpan horaInicioRecorrido = new(4, 50, 0);
     [ObservableProperty] private TimeSpan horaLlegadaDestino = new(6, 20, 0);
+
+    // Default range logic fixed to support future planning
     [ObservableProperty] private DateTime fechaInicio = DateTime.Today;
-    [ObservableProperty] private DateTime fechaFin = DateTime.Today.AddMonths(5);
+    [ObservableProperty] private DateTime fechaFin = DateTime.Today.AddMonths(1);
+
     [ObservableProperty] private Vehiculo? selectedVehiculo;
     [ObservableProperty] private Usuario? selectedChofer;
 
@@ -69,8 +77,6 @@ public partial class ScheduleTripViewModel : ObservableObject
 
     [ObservableProperty] private bool isMapModalVisible = false;
 
-    //  Vista satélite/híbrida — gratis, es el mismo Maps SDK nativo que ya usa
-    // toda la app, solo cambia el tipo de mosaico que se renderiza.
     [ObservableProperty] private MapType currentMapType = MapType.Street;
 
     [RelayCommand]
@@ -84,11 +90,12 @@ public partial class ScheduleTripViewModel : ObservableObject
     [ObservableProperty] private double longitudTemporal = -89.5597;
 
     private Usuario? _jefeActual;
+    private string? _idDuenoFlota;
 
     partial void OnSelectedTipoViajeChanged(string value)
     {
         if (string.IsNullOrEmpty(value)) return;
-        bool esIda = value.Contains("Ida", StringComparison.OrdinalIgnoreCase) || value.Contains("Inbound", StringComparison.OrdinalIgnoreCase);
+        bool esIda = AppResources.IsInboundTrip(value);
         if (esIda)
         {
             HoraInicioRecorrido = HoraSalida.Subtract(TimeSpan.FromMinutes(100));
@@ -129,18 +136,96 @@ public partial class ScheduleTripViewModel : ObservableObject
         _ = LoadDataAsync();
     }
 
-    private void CargarDestinosFrecuentes()
+    private async Task CargarDestinosFrecuentesFlotaAsync(string ownerId)
     {
-        DestinosFrecuentes.Clear();
-        string json = Preferences.Default.Get("MisDestinosFrecuentes", "");
-        if (!string.IsNullOrEmpty(json))
+        var unicos = new Dictionary<string, WaypointTemporal>();
+
+        try
         {
-            var lista = JsonConvert.DeserializeObject<List<WaypointTemporal>>(json);
-            if (lista != null)
+            string json = Preferences.Default.Get("MisDestinosFrecuentes", "");
+            if (!string.IsNullOrEmpty(json))
             {
-                foreach (var d in lista) DestinosFrecuentes.Add(d);
+                var listaLocal = JsonConvert.DeserializeObject<List<WaypointTemporal>>(json);
+                if (listaLocal != null)
+                {
+                    foreach (var d in listaLocal)
+                    {
+                        if (!string.IsNullOrWhiteSpace(d.Alias) && !unicos.ContainsKey(d.Alias.ToLowerInvariant()))
+                        {
+                            unicos[d.Alias.ToLowerInvariant()] = d;
+                        }
+                    }
+                }
             }
         }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"⚠️ Error leyendo preferencias locales: {ex.Message}");
+        }
+
+        try
+        {
+            // 🔧 Filtra del lado de Supabase en vez de traer todos los viajes de
+            // todas las flotas y filtrar acá en el celular.
+            var viajesActivos = await _supabaseService.GetAllActiveTripsAsync(new List<string> { ownerId });
+            if (viajesActivos != null)
+            {
+                foreach (var viaje in viajesActivos)
+                {
+                    if (!string.IsNullOrWhiteSpace(viaje.MetaTexto) && viaje.MetaLatitud.HasValue && viaje.MetaLongitud.HasValue)
+                    {
+                        string clave = viaje.MetaTexto.ToLowerInvariant();
+                        if (!unicos.ContainsKey(clave))
+                        {
+                            unicos[clave] = new WaypointTemporal
+                            {
+                                Alias = viaje.MetaTexto,
+                                Latitud = viaje.MetaLatitud.Value,
+                                Longitud = viaje.MetaLongitud.Value
+                            };
+                        }
+                    }
+
+                    try
+                    {
+                        var paradas = await _supabaseService.GetParadasByViajeAsync(viaje.Id);
+                        if (paradas != null)
+                        {
+                            foreach (var p in paradas)
+                            {
+                                if (!string.IsNullOrWhiteSpace(p.NombreLugar) && p.Latitud.HasValue && p.Longitud.HasValue)
+                                {
+                                    string clave = p.NombreLugar.ToLowerInvariant();
+                                    if (!unicos.ContainsKey(clave))
+                                    {
+                                        unicos[clave] = new WaypointTemporal
+                                        {
+                                            Alias = p.NombreLugar,
+                                            Latitud = p.Latitud.Value,
+                                            Longitud = p.Longitud.Value
+                                        };
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"⚠️ Error conectando con Supabase para destinos: {ex.Message}");
+        }
+
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            DestinosFrecuentes.Clear();
+            foreach (var item in unicos.Values.OrderBy(x => x.Alias))
+            {
+                DestinosFrecuentes.Add(item);
+            }
+        });
     }
 
     private void GuardarDestinoFrecuente(WaypointTemporal meta)
@@ -152,41 +237,90 @@ public partial class ScheduleTripViewModel : ObservableObject
         {
             lista.Add(meta);
             Preferences.Default.Set("MisDestinosFrecuentes", JsonConvert.SerializeObject(lista));
-            DestinosFrecuentes.Add(meta);
+
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                if (!DestinosFrecuentes.Any(x => x.Alias.Equals(meta.Alias, StringComparison.OrdinalIgnoreCase)))
+                {
+                    DestinosFrecuentes.Add(meta);
+                }
+            });
         }
     }
 
     [RelayCommand]
     public async Task LoadDataAsync()
     {
-        IsLoading = true;
+        // 1. Avisar al hilo principal que encienda el spinner de carga
+        MainThread.BeginInvokeOnMainThread(() => IsLoading = true);
 
-        //  FIX: Actualizamos la caché de pines cada vez que la página carga datos
-        CargarDestinosFrecuentes();
-
-        var authUser = _supabaseService.GetCurrentUser();
-        if (authUser != null && !string.IsNullOrEmpty(authUser.Id))
+        try
         {
-            _jefeActual = await _supabaseService.GetUserDataAsync(authUser.Id);
-            if (_jefeActual != null)
+            var authUser = _supabaseService.GetCurrentUser();
+            if (authUser != null && !string.IsNullOrEmpty(authUser.Id))
             {
-                IsFleetManager = _jefeActual.Rol.Contains("jefe", StringComparison.OrdinalIgnoreCase) || _jefeActual.Rol.Contains("independiente", StringComparison.OrdinalIgnoreCase);
-                string ownerId = IsFleetManager ? _jefeActual.Id : (_jefeActual.IdJefe ?? _jefeActual.Id);
-
-                var vehiculos = await _supabaseService.GetVehiclesByOwnerAsync(ownerId);
-                VehiculosDisponibles.Clear();
-                foreach (var v in vehiculos.Where(veh => veh.Estado == "activo")) VehiculosDisponibles.Add(v);
-
-                ChoferesDisponibles.Clear();
-                if (IsFleetManager)
+                _jefeActual = await _supabaseService.GetUserDataAsync(authUser.Id);
+                if (_jefeActual != null)
                 {
-                    ChoferesDisponibles.Add(_jefeActual);
-                    var empleados = await _supabaseService.GetEmployeesByBossAsync(ownerId);
-                    foreach (var emp in empleados) ChoferesDisponibles.Add(emp);
+                    // 🆕 También puede programar un empleado con permiso (sub-jefe):
+                    // los viajes quedan a nombre del dueño de la flota.
+                    IsFleetManager = RolesFlota.PuedeGestionarViajes(_jefeActual);
+                    string ownerId = RolesFlota.IdFlota(_jefeActual);
+                    _idDuenoFlota = ownerId;
+                    Usuario? duenoFlota = ownerId == _jefeActual.Id ? _jefeActual : await _supabaseService.GetUserDataAsync(ownerId);
+
+                    await CargarDestinosFrecuentesFlotaAsync(ownerId);
+
+                    // 2. Descargar los datos en segundo plano (Correcto)
+                    var vehiculos = await _supabaseService.GetVehiclesByOwnerAsync(ownerId);
+                    var empleados = new List<Usuario>();
+
+                    if (IsFleetManager)
+                    {
+                        empleados = await _supabaseService.GetEmployeesByBossAsync(ownerId);
+                    }
+
+                    // 3. 🔥 SOLUCIÓN: Empujar los datos a la interfaz estrictamente en el Hilo Principal
+                    MainThread.BeginInvokeOnMainThread(() =>
+                    {
+                        VehiculosDisponibles.Clear();
+                        foreach (var v in vehiculos.Where(veh => veh.Estado == "activo"))
+                            VehiculosDisponibles.Add(v);
+
+                        ChoferesDisponibles.Clear();
+                        if (IsFleetManager)
+                        {
+                            if (duenoFlota != null) ChoferesDisponibles.Add(duenoFlota);
+                            foreach (var emp in empleados)
+                                ChoferesDisponibles.Add(emp);
+                        }
+                    });
                 }
             }
         }
-        IsLoading = false;
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error cargando datos de programación: {ex.Message}");
+            // 🆕 Antes esto se perdía en silencio (solo Debug.WriteLine, invisible sin
+            // Visual Studio conectado). Ahora se guarda Y se muestra al toque.
+            PassGold.Services.CrashLogger.Guardar(ex, "ScheduleTripViewModel.LoadDataAsync");
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                if (Application.Current?.MainPage != null)
+                {
+#if DEBUG
+                    await Application.Current.MainPage.DisplayAlert(AppResources.Schedule_LoadScreenError, ex.ToString(), AppResources.Global_Ok);
+#else
+                    await Application.Current.MainPage.DisplayAlert(AppResources.Schedule_LoadScreenError, AppResources.App_UnexpectedCloseBody, AppResources.Global_Ok);
+#endif
+                }
+            });
+        }
+        finally
+        {
+            // 4. Apagar el spinner de carga de forma segura
+            MainThread.BeginInvokeOnMainThread(() => IsLoading = false);
+        }
     }
 
     [RelayCommand]
@@ -203,17 +337,35 @@ public partial class ScheduleTripViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public void ConfirmarPuntoMapa()
+    public async Task ConfirmarPuntoMapaAsync()
     {
         if (string.IsNullOrWhiteSpace(NuevoAliasPunto))
         {
-            App.Current?.MainPage?.DisplayAlert(AppResources.Global_Attention, AppResources.Schedule_MapErrorNoName, AppResources.Global_Ok);
+            if (Application.Current?.MainPage != null)
+                await Application.Current.MainPage.DisplayAlert(AppResources.Global_Attention, AppResources.Schedule_MapErrorNoName, AppResources.Global_Ok);
             return;
         }
+
+        IsLoading = true;
+        string detalleUbicacion = AppResources.Schedule_MapDefaultLocation;
+
+        try
+        {
+            var placemarks = await Geocoding.Default.GetPlacemarksAsync(LatitudTemporal, LongitudTemporal);
+            var placemark = placemarks?.FirstOrDefault();
+
+            if (placemark != null)
+            {
+                detalleUbicacion = $"{placemark.Thoroughfare} {placemark.SubThoroughfare}, {placemark.Locality}".Trim(new char[] { ' ', ',' });
+                if (string.IsNullOrWhiteSpace(detalleUbicacion)) detalleUbicacion = placemark.FeatureName ?? AppResources.Schedule_MapDetectedLocation;
+            }
+        }
+        catch { /* Ignorar silenciosamente si no hay internet o el GPS falla */ }
 
         var nuevaMeta = new WaypointTemporal
         {
             Alias = NuevoAliasPunto,
+            Detalle = detalleUbicacion,
             Latitud = LatitudTemporal,
             Longitud = LongitudTemporal
         };
@@ -222,6 +374,7 @@ public partial class ScheduleTripViewModel : ObservableObject
         GuardarDestinoFrecuente(nuevaMeta);
 
         IsMapModalVisible = false;
+        IsLoading = false;
     }
 
     [RelayCommand]
@@ -238,7 +391,7 @@ public partial class ScheduleTripViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public async Task AddAsignacionAsync()
+    public void AddAsignacion()
     {
         if (SelectedChofer == null || SelectedVehiculo == null) return;
         if (Asignaciones.Any(a => a.Chofer.Id == SelectedChofer.Id || a.Vehiculo.Id == SelectedVehiculo.Id)) return;
@@ -251,91 +404,107 @@ public partial class ScheduleTripViewModel : ObservableObject
     [RelayCommand]
     public async Task SaveTripAsync()
     {
-        if (App.Current?.MainPage == null) return;
-        if (MetasDelViaje.Count == 0) { await App.Current.MainPage.DisplayAlert(AppResources.Global_Attention, AppResources.Schedule_MapErrorNoWaypoints, AppResources.Global_Ok); return; }
-        if (Asignaciones.Count == 0) { await App.Current.MainPage.DisplayAlert(AppResources.Global_Attention, AppResources.Schedule_AddAtLeastOne, AppResources.Global_Ok); return; }
+        if (Application.Current?.MainPage == null) return;
+
+        if (MetasDelViaje.Count == 0)
+        {
+            await Application.Current.MainPage.DisplayAlert(AppResources.Global_Attention, AppResources.Schedule_MapErrorNoWaypoints, AppResources.Global_Ok);
+            return;
+        }
+        if (Asignaciones.Count == 0)
+        {
+            await Application.Current.MainPage.DisplayAlert(AppResources.Global_Attention, AppResources.Schedule_AddAtLeastOne, AppResources.Global_Ok);
+            return;
+        }
         if (_jefeActual == null) return;
 
         IsLoading = true;
 
-        var primeraMeta = MetasDelViaje.First();
-
-        var viajeBase = new Viaje
+        try
         {
-            Id = Guid.NewGuid().ToString(),
-            TipoViaje = SelectedTipoViaje,
-            HoraSalida = DateTime.Today.Add(HoraSalida).DesdeElSalvadorAUtc(),
-            HoraInicioRecorrido = HoraInicioRecorrido,
-            HoraLlegadaDestino = HoraLlegadaDestino,
-            Estado = "activo",
-            DiasSemana = ConstruirDiasSemanaTexto(),
-            FechaInicio = FechaInicio,
-            FechaFin = FechaFin,
-            IdCreador = _jefeActual.Id,
-            MetaTexto = primeraMeta.Alias,
-            MetaLatitud = primeraMeta.Latitud,
-            MetaLongitud = primeraMeta.Longitud
-        };
+            var primeraMeta = MetasDelViaje.First();
 
-        var (viajeCreado, _) = await _supabaseService.CreateTripAndReturnAsync(viajeBase);
-        if (viajeCreado == null)
-        {
-            IsLoading = false;
-            await App.Current.MainPage.DisplayAlert(AppResources.Global_Error, AppResources.Schedule_SaveError, AppResources.Global_Ok);
-            return;
-        }
-
-        //  Guardar TODAS las metas en viaje_paradas (antes solo se guardaba
-        // MetasDelViaje.First() en viajes.meta_texto/meta_latitud/meta_longitud,
-        // y el resto se perdía). MetaTexto/MetaLatitud/MetaLongitud del viaje
-        // se mantienen igual que antes para no romper pantallas que ya dependen
-        // de ese campo (ej. la "meta oficial" que ve el pasajero en el mapa).
-        var paradasNuevas = MetasDelViaje.Select((meta, index) => new ViajeParada
-        {
-            Id = Guid.NewGuid().ToString(),
-            IdViaje = viajeCreado.Id,
-            Orden = index + 1,
-            NombreLugar = meta.Alias,
-            Latitud = meta.Latitud,
-            Longitud = meta.Longitud
-        }).ToList();
-
-        var (paradasExito, paradasError) = await _supabaseService.CreateParadasBulkAsync(paradasNuevas);
-        if (!paradasExito)
-        {
-            Debug.WriteLine($"⚠️ No se guardaron las paradas adicionales en viaje_paradas: {paradasError}");
-            // No cortamos el flujo — el viaje y la meta principal ya se guardaron correctamente.
-        }
-
-        var fechas = ConstruirFechasDelRango();
-        var asignacionesNuevas = new List<Asignacion>();
-        foreach (var fecha in fechas)
-        {
-            foreach (var item in Asignaciones)
+            var viajeBase = new Viaje
             {
-                asignacionesNuevas.Add(new Asignacion
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    IdViaje = viajeCreado.Id,
-                    IdChofer = item.Chofer.Id,
-                    IdVehiculo = item.Vehiculo.Id,
-                    Fecha = fecha.Add(HoraSalida).DesdeElSalvadorAUtc(),
-                    Estado = "activo"
+                Id = Guid.NewGuid().ToString(),
+                TipoViaje = AppResources.TripTypeToDb(SelectedTipoViaje),
+                // Align to the specific Date selected by the user, rather than forcing today's date
+                HoraSalida = FechaInicio.Date.Add(HoraSalida).DesdeElSalvadorAUtc(),
+                HoraInicioRecorrido = HoraInicioRecorrido,
+                HoraLlegadaDestino = HoraLlegadaDestino,
+                Estado = "activo",
+                DiasSemana = ConstruirDiasSemanaTexto(),
+                FechaInicio = FechaInicio,
+                FechaFin = FechaFin,
+                IdCreador = _idDuenoFlota ?? _jefeActual.Id,
+                MetaTexto = primeraMeta.Alias,
+                MetaLatitud = primeraMeta.Latitud,
+                MetaLongitud = primeraMeta.Longitud
+            };
+
+            var (viajeCreado, _) = await _supabaseService.CreateTripAndReturnAsync(viajeBase);
+            if (viajeCreado == null)
+            {
+                MainThread.BeginInvokeOnMainThread(async () => {
+                    IsLoading = false;
+                    await Application.Current.MainPage.DisplayAlert(AppResources.Global_Error, AppResources.Schedule_SaveError, AppResources.Global_Ok);
                 });
+                return;
             }
+
+            var paradasNuevas = MetasDelViaje.Select((meta, index) => new ViajeParada
+            {
+                Id = Guid.NewGuid().ToString(),
+                IdViaje = viajeCreado.Id,
+                Orden = index + 1,
+                NombreLugar = meta.Alias,
+                Latitud = meta.Latitud,
+                Longitud = meta.Longitud
+            }).ToList();
+
+            await _supabaseService.CreateParadasBulkAsync(paradasNuevas);
+
+            var fechas = ConstruirFechasDelRango();
+            var asignacionesNuevas = new List<Asignacion>();
+            foreach (var fecha in fechas)
+            {
+                foreach (var item in Asignaciones)
+                {
+                    asignacionesNuevas.Add(new Asignacion
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        IdViaje = viajeCreado.Id,
+                        IdChofer = item.Chofer.Id,
+                        IdVehiculo = item.Vehiculo.Id,
+                        Fecha = fecha.Add(HoraSalida).DesdeElSalvadorAUtc(),
+                        Estado = "activo"
+                    });
+                }
+            }
+
+            var (exito, _) = await _supabaseService.CreateAssignmentsBulkAsync(asignacionesNuevas);
+
+            MainThread.BeginInvokeOnMainThread(async () => {
+                IsLoading = false;
+
+                if (!exito)
+                {
+                    await Application.Current.MainPage.DisplayAlert(AppResources.Global_Error, AppResources.Schedule_SaveError, AppResources.Global_Ok);
+                    return;
+                }
+
+                await Application.Current.MainPage.DisplayAlert(AppResources.Global_Attention, AppResources.Schedule_TripSaved, AppResources.Global_Ok);
+                await Shell.Current.GoToAsync("..");
+            });
         }
-
-        var (exito, _) = await _supabaseService.CreateAssignmentsBulkAsync(asignacionesNuevas);
-        IsLoading = false;
-
-        if (!exito)
+        catch (Exception ex)
         {
-            await App.Current.MainPage.DisplayAlert(AppResources.Global_Error, AppResources.Schedule_SaveError, AppResources.Global_Ok);
-            return;
+            Debug.WriteLine(ex.Message);
+            MainThread.BeginInvokeOnMainThread(async () => {
+                IsLoading = false;
+                await Application.Current.MainPage.DisplayAlert(AppResources.Global_Error, AppResources.Schedule_SaveError, AppResources.Global_Ok);
+            });
         }
-
-        await App.Current.MainPage.DisplayAlert(AppResources.Global_Attention, AppResources.Schedule_TripSaved, AppResources.Global_Ok);
-        await Shell.Current.GoToAsync("..");
     }
 
     private string ConstruirDiasSemanaTexto()

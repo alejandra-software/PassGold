@@ -1,5 +1,4 @@
 using PassGold.ViewModels;
-using Microsoft.Maui.Controls;
 
 namespace PassGold.Views;
 
@@ -8,6 +7,13 @@ public partial class FleetSchedulePage : ContentPage
     public FleetSchedulePage()
     {
         InitializeComponent();
-        BindingContext = new PassengerDashboardViewModel();
+        BindingContext = new FleetScheduleViewModel();
+    }
+
+    // Al volver de confirmar la reserva, la agenda se recarga para mostrar los ✅
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        if (BindingContext is FleetScheduleViewModel vm) vm.RecargarSiHaceFalta();
     }
 }

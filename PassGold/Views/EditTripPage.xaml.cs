@@ -5,16 +5,28 @@ using Microsoft.Maui.Maps;
 using Microsoft.Maui.Devices.Sensors;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
+using Microsoft.Maui.ApplicationModel;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace PassGold.Views;
 
 public partial class EditTripPage : ContentPage
 {
+    // Mismo patrón que ScheduleTripPage: pedimos el permiso de ubicación recién
+    // en OnAppearing, y solo si se concede activamos IsShowingUser por código —
+    // nunca directo en el XAML (eso era lo que causaba el crash).
+    private bool _permisosVerificados = false;
+
     public EditTripPage()
     {
         InitializeComponent();
-        BindingContext = new EditTripViewModel();
+
+        if (App.Services != null)
+        {
+            BindingContext = App.Services.GetService<EditTripViewModel>();
+        }
 
         MapaDestinosOficial.PropertyChanged += (s, e) =>
         {
@@ -41,6 +53,42 @@ public partial class EditTripPage : ContentPage
         }
     }
 
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+
+        if (!_permisosVerificados)
+        {
+            await VerificarPermisoUbicacionAsync();
+            _permisosVerificados = true;
+        }
+    }
+
+    private async Task VerificarPermisoUbicacionAsync()
+    {
+        try
+        {
+            var status = await Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>();
+
+            if (status != PermissionStatus.Granted)
+            {
+                status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+            }
+
+            if (status == PermissionStatus.Granted)
+            {
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    MapaDestinosOficial.IsShowingUser = true;
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error solicitando permisos: {ex.Message}");
+        }
+    }
+
     private async void BuscadorMetas_SearchButtonPressed(object sender, EventArgs e)
     {
         var query = BuscadorMetas.Text;
@@ -48,9 +96,8 @@ public partial class EditTripPage : ContentPage
 
         try
         {
-            string busquedaExacta = $"{query}, El Salvador";
-            var ubicaciones = await Geocoding.Default.GetLocationsAsync(busquedaExacta);
-            var ubicacionEncontrada = ubicaciones?.FirstOrDefault();
+            // Buscador compartido (Apple Maps en iPhone + filtros para El Salvador)
+            var ubicacionEncontrada = await BuscadorLugares.BuscarAsync(query, MapaDestinosOficial.VisibleRegion?.Center);
 
             if (ubicacionEncontrada != null)
             {

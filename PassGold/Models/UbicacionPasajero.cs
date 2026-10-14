@@ -25,6 +25,10 @@ public class UbicacionPasajero : BaseModel
     [Column("longitud")]
     public double? Longitud { get; set; }
 
+    // "casa" = lado de la casa · "alterno" = punto no oficial (ej. Metrocentro)
+    [Column("tipo")]
+    public string Tipo { get; set; } = "casa";
+
     [Column("creado_en")]
     public DateTime CreadoEn { get; set; } = DateTime.UtcNow;
 
